@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1056651435191",
+    "project_id": "odlikas-e5bf1",
+    "storage_bucket": "odlikas-e5bf1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1056651435191:android:233ccbaaff44ef63e38132",
+        "android_client_info": {
+          "package_name": "com.example.odlikas_ekran"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjjadZoaEJqiMC1k1hbzlSunBZh4ATqZM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1056651435191:android:3e779fc795f6a7c5e38132",
+        "android_client_info": {
+          "package_name": "com.example.odlikas_mobilna"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjjadZoaEJqiMC1k1hbzlSunBZh4ATqZM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
