@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:odlikas_ekran/responsive.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,6 +14,8 @@ class QRCodePage extends StatefulWidget {
 }
 
 class _QRCodePageState extends State<QRCodePage> {
+  Responsive res = new Responsive();
+
   late String _screenId;
 
   /// Datum i vrijeme kada QR kôd ističe
@@ -172,41 +175,42 @@ class _QRCodePageState extends State<QRCodePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
+                padding: EdgeInsets.all(res.scaleWidth(context, 2)),
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: Colors.black,
-                    width: 2,
+                    width: res.scaleWidth(context, 0.5),
                   ),
                 ),
                 child: QrImageView(
                   data: _screenId,
                   version: QrVersions.auto,
-                  size: 210.0,
+                  size: res.scaleWidth(context, 70),
                   gapless: true,
                 ),
               ),
               Container(
-                margin: const EdgeInsets.only(bottom: 20, top: 5),
+                margin: EdgeInsets.only(bottom: res.scaleHeight(context, 20), top: res.scaleHeight(context, 5)),
                 child: Text(
                   '$formattedTime min',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 20,
+                    fontSize: res.scaleWidth(context, 10),
                   ),
                 ),
               ),
-              const Text(
+              Text(
                 'SKENIRAJ ME PREKO ODLIKAŠA DA ZAPOČNEMO',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 20,
+                  fontSize: res.scaleWidth(context, 6),
                 ),
               ),
-              const Text(
+              Text(
                 'UČITI',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 20,
+                  fontSize: res.scaleWidth(context, 6),
                 ),
               ),
             ],
