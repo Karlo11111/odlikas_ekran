@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 
+import 'package:odlikas_ekran/models/grades.dart';
+
 class GradeWheel extends StatelessWidget {
-  final List<dynamic> subjects;
+  final List<Subject> subjects;
 
   const GradeWheel({super.key, required this.subjects});
 
@@ -39,12 +41,12 @@ class GradeWheel extends StatelessWidget {
   }
 
   //racunanje prosjeka ocjena iz api-ja
-  double calculateAverageGrade(List<dynamic> subjects) {
+  double calculateAverageGrade(List<Subject> subjects) {
     double totalGrades = 0.0;
     int count = 0;
 
     for (var subject in subjects) {
-      String gradeStr = subject['grade'];
+      String gradeStr = subject.grade;
       if (gradeStr != 'N/A') {
         double grade = double.parse(gradeStr.replaceAll(',', '.'));
         double roundedGrade = roundGradeCroatian(grade);
@@ -62,7 +64,7 @@ class GradeWheel extends StatelessWidget {
 }
 
 class GradeWheelPainter extends CustomPainter {
-  final List<dynamic> subjects;
+  final List<Subject> subjects;
 
   GradeWheelPainter(this.subjects);
 
@@ -77,7 +79,7 @@ class GradeWheelPainter extends CustomPainter {
     // prikupljanje ocjena i zbroj ponavljanja
     final Map<double, int> gradeCounts = {};
     for (var subject in subjects) {
-      String gradeStr = subject['grade'];
+      String gradeStr = subject.grade;
       if (gradeStr == 'N/A') continue;
 
       double grade = double.parse(gradeStr.replaceAll(',', '.'));

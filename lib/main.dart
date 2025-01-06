@@ -73,7 +73,7 @@ class MyApp extends StatelessWidget {
           '/setup': (context) => const SetupScreen(),
           '/qr': (context) => QRCodePage(screenId: screenId),
           '/home': (context) => HomePage(),
-          '/grades': (context) => const GradesPage(),
+          '/grades': (context) => GradesPage(),
         },
       ),
     );

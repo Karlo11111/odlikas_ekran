@@ -18,8 +18,7 @@ class _HomePageState extends State<HomePage> {
     // Fetch data when the homepage is loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final viewModel = context.read<HomePageViewModel>();
-      viewModel.fetchStudentProfile("karlo.ciciliani@skole.hr", "2kw3xpAS");
-      viewModel.fetchGrades("natalie.piljic@skole.hr", "D5Za2kuB");
+      viewModel.fetchGrades("karlo.ciciliani@skole.hr", "2kw3xpAS");
     });
   }
 
@@ -97,7 +96,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             child: ClipOval(
                               child: GradeWheel(
-                                  subjects: viewModel.grades?['subjects']),
+                                  subjects: viewModel.grades?.subjects ?? []),
                             ),
                           ),
                         ),
