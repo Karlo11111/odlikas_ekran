@@ -19,7 +19,7 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final viewModel = context.read<HomePageViewModel>();
       viewModel.fetchStudentProfile("karlo.ciciliani@skole.hr", "2kw3xpAS");
-      viewModel.fetchGrades("karlo.ciciliani@skole.hr", "2kw3xpAS");
+      viewModel.fetchGrades("natalie.piljic@skole.hr", "D5Za2kuB");
     });
   }
 
@@ -80,21 +80,25 @@ class _HomePageState extends State<HomePage> {
                     ),
 
                     // GradeWheel u sredini
+
                     Positioned.fill(
                       child: Align(
                         alignment: Alignment.center,
-                        child: Container(
-                          width: MediaQuery.of(context).size.width *
-                              0.25, // Adjust wheel size
-                          height: MediaQuery.of(context).size.width * 0.25,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Theme.of(context)
-                                .scaffoldBackgroundColor, // za skrivanje edge-va
-                          ),
-                          child: ClipOval(
-                            child: GradeWheel(
-                                subjects: viewModel.grades?['subjects']),
+                        child: GestureDetector(
+                          onTap: () => Navigator.pushNamed(context, '/grades'),
+                          child: Container(
+                            width: MediaQuery.of(context).size.width *
+                                0.25, // Adjust wheel size
+                            height: MediaQuery.of(context).size.width * 0.25,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Theme.of(context)
+                                  .scaffoldBackgroundColor, // za skrivanje edge-va
+                            ),
+                            child: ClipOval(
+                              child: GradeWheel(
+                                  subjects: viewModel.grades?['subjects']),
+                            ),
                           ),
                         ),
                       ),
