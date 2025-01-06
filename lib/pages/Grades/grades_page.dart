@@ -33,7 +33,7 @@ class _GradesPageState extends State<GradesPage> {
                 // da je app bar scrollable
                 SliverToBoxAdapter(
                   child: Container(
-                    color: Colors.white,
+                    color: const Color.fromRGBO(255, 255, 255, 1),
                     padding: EdgeInsets.symmetric(
                       horizontal: MediaQuery.of(context).size.width * 0.02,
                       vertical: 16.0,
