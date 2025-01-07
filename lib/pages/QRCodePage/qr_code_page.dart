@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:odlikas_ekran/responsive.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lottie/lottie.dart';
 
 class QRCodePage extends StatefulWidget {
   final String screenId;
@@ -141,8 +143,15 @@ class _QRCodePageState extends State<QRCodePage> {
   Widget build(BuildContext context) {
     // ako nije zavrsilo s inicijalizacijom prikazi loading
     if (!_isInitialized) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: Center(
+          child: Lottie.asset(
+            'assets/animations/bird_animation.json',
+            width: 150,
+            height: 150,
+            fit: BoxFit.contain,
+          ),
+        ),
       );
     }
 
@@ -153,9 +162,15 @@ class _QRCodePageState extends State<QRCodePage> {
         return _buildExpiredScreen();
       }
       // inace prikazi loading
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return Scaffold(
+          body: Center(
+        child: Lottie.asset(
+          'assets/animations/bird_animation.json',
+          width: 150,
+          height: 150,
+          fit: BoxFit.contain,
+        ),
+      ));
     }
 
     // izračunaj preostalo vrijeme
@@ -174,43 +189,66 @@ class _QRCodePageState extends State<QRCodePage> {
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                padding: EdgeInsets.all(res.scaleWidth(context, 2)),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Colors.black,
-                    width: res.scaleWidth(context, 0.5),
+              SizedBox(height: res.scaleHeight(context, 150)),
+              //qr kod i timer widget u jednom redu
+              Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(res.scaleWidth(context, 6)),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.black,
+                        width: res.scaleWidth(context, 1.7),
+                      ),
+                    ),
+                    child: QrImageView(
+                      data: _screenId,
+                      version: QrVersions.auto,
+                      size: res.scaleWidth(context, 70),
+                      gapless: true,
+                    ),
                   ),
-                ),
-                child: QrImageView(
-                  data: _screenId,
-                  version: QrVersions.auto,
-                  size: res.scaleWidth(context, 70),
-                  gapless: true,
-                ),
-              ),
-              Container(
-                margin: EdgeInsets.only(bottom: res.scaleHeight(context, 20), top: res.scaleHeight(context, 5)),
-                child: Text(
-                  '$formattedTime min',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: res.scaleWidth(context, 10),
+                  SizedBox(
+                    width: res.scaleWidth(context, 20),
                   ),
-                ),
+                  //do isteka tekst and timer text in a column
+                  Column(
+                    children: [
+                      Text('Do isteka QR koda:',
+                          style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w800,
+                              fontSize: res.scaleWidth(context, 12))),
+                      Container(
+                        margin: EdgeInsets.only(
+                            bottom: res.scaleHeight(context, 20),
+                            top: res.scaleHeight(context, 5)),
+                        child: Text(
+                          '$formattedTime min',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: res.scaleWidth(context, 15),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+
+              SizedBox(height: res.scaleHeight(context, 120)),
+
               Text(
                 'SKENIRAJ ME PREKO ODLIKAŠA DA ZAPOČNEMO',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: res.scaleWidth(context, 6),
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w800,
+                  fontSize: res.scaleWidth(context, 8),
                 ),
               ),
               Text(
                 'UČITI',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: res.scaleWidth(context, 6),
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w800,
+                  fontSize: res.scaleWidth(context, 8),
                 ),
               ),
             ],

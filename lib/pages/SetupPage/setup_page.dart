@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:odlikas_ekran/pages/QRCodePage/qr_code_page.dart';
 import 'package:odlikas_ekran/responsive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lottie/lottie.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -83,30 +85,62 @@ class _SetupScreenState extends State<SetupScreen> {
     return Scaffold(
       body: Center(
         child: _loading
-            ? const CircularProgressIndicator()
+            ? Center(
+                child: Lottie.asset(
+                  'assets/animations/bird_animation.json',
+                  width: 150,
+                  height: 150,
+                  fit: BoxFit.contain,
+                ),
+              )
             : Padding(
                 padding: EdgeInsets.all(res.scaleWidth(context, 16.0)),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'Dobrodošli u Odlikaš!',
-                      style:
-                          TextStyle(fontSize: res.scaleWidth(context, 16), fontWeight: FontWeight.bold),
+                    SizedBox(height: res.scaleHeight(context, 200)),
+                    Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            'Dobrodošli u ODLIKAŠ+!',
+                            style: GoogleFonts.inter(
+                                fontSize: res.scaleWidth(context, 17),
+                                fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: res.scaleHeight(context, 16)),
+                          Text(
+                            'Primjetili smo da je ovo prvo pokretanje ODLIKAŠ+ aplikacije.\n'
+                            'Pritisnite "Nastavi" kako bi i ti postao ODLIKAŠ.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                                color: Color.fromRGBO(113, 113, 113, 1),
+                                fontSize: res.scaleWidth(context, 6.2),
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: res.scaleHeight(context, 16)),
-                    Text(
-                      'Ovo je prvo pokretanje aplikacije.\n'
-                      'Pritisnite "Nastavi" za postavljanje i povezivanje s mobilnim uređajem.',
-                      textAlign: TextAlign.center, style: TextStyle(fontSize: res.scaleWidth(context, 6)),
-                    ),
-                    SizedBox(height: res.scaleHeight(context, 32)),
+                    SizedBox(height: res.scaleHeight(context, 200)),
                     ElevatedButton(
                       style: ButtonStyle(
-                        padding: MaterialStateProperty.all(EdgeInsets.only(left: res.scaleWidth(context, 6), right:  res.scaleWidth(context, 6), top:  res.scaleWidth(context, 2), bottom:  res.scaleWidth(context, 2)))
-                      ),
+                          backgroundColor: WidgetStateProperty.all(
+                              Color.fromRGBO(23, 148, 210, 1)),
+                          padding: WidgetStateProperty.all(EdgeInsets.only(
+                              left: res.scaleWidth(context, 50),
+                              right: res.scaleWidth(context, 50),
+                              top: res.scaleWidth(context, 5),
+                              bottom: res.scaleWidth(context, 5)))),
                       onPressed: _onContinuePressed,
-                      child: Text('Nastavi', style: TextStyle(fontSize: res.scaleWidth(context, 8)),),
+                      child: Text(
+                        'Nastavi',
+                        style: GoogleFonts.inter(
+                          fontSize: res.scaleWidth(context, 8),
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ],
                 ),

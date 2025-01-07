@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/home_page_viewmodel.dart';
+import 'package:lottie/lottie.dart';
 
 class GradesPage extends StatefulWidget {
   const GradesPage({super.key});
@@ -27,69 +28,102 @@ class _GradesPageState extends State<GradesPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: viewModel.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Lottie.asset(
+                'assets/animations/bird_animation.json',
+                width: 150,
+                height: 150,
+                fit: BoxFit.contain,
+              ),
+            )
           : CustomScrollView(
               slivers: [
                 // da je app bar scrollable
                 SliverToBoxAdapter(
                   child: Container(
-                    color: const Color.fromRGBO(255, 255, 255, 1),
+                    color: const Color.fromRGBO(
+                        255, 255, 255, 1), // Background color
                     padding: EdgeInsets.symmetric(
-                      horizontal: MediaQuery.of(context).size.width * 0.02,
+                      horizontal: MediaQuery.of(context).size.width *
+                          0.04, // Adjust padding
                       vertical: 16.0,
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        // Back button
                         IconButton(
                           icon: const Icon(Icons.arrow_back),
                           iconSize: 50,
                           color: const Color.fromRGBO(236, 145, 32, 1),
                           onPressed: () {
-                            Navigator.of(context).pop();
+                            Navigator.of(context).pop(); // Navigate back
                           },
                         ),
-                        Text(
-                          viewModel.studentProfile?.studentSchool ??
-                              "Loading...",
-                          style: TextStyle(
-                            fontSize: MediaQuery.of(context).size.width * 0.025,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(
-                            width: 48), // Placeholder da bude u sredini
-                      ],
-                    ),
-                  ),
-                ),
 
-                // dobrodosao tekst
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: MediaQuery.of(context).size.width * 0.02),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Dobrodošao ${viewModel.studentProfile?.studentName ?? ''}",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color.fromRGBO(113, 113, 113, 100),
-                          ),
+                        // Program and Razrednik/ca stacked vertically
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const SizedBox(height: 16),
+                            Text(
+                              viewModel.studentProfile?.studentProgram ??
+                                  "Loading...",
+                              style: TextStyle(
+                                fontSize:
+                                    MediaQuery.of(context).size.width * 0.03,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center, // Align text center
+                            ),
+                            const SizedBox(height: 4), // Space between texts
+                            Text(
+                              "Razrednik/ca: ${viewModel.studentProfile?.classMaster ?? ''}",
+                              style: TextStyle(
+                                fontSize:
+                                    MediaQuery.of(context).size.width * 0.015,
+                                fontWeight: FontWeight.normal,
+                                color: const Color.fromRGBO(113, 113, 113, 1),
+                              ),
+                              textAlign: TextAlign.center, // Align text center
+                            ),
+
+                            Row(
+                              children: [
+                                Text(
+                                  viewModel.studentProfile?.studentGrade ?? '',
+                                  style: TextStyle(
+                                    fontSize:
+                                        MediaQuery.of(context).size.width *
+                                            0.035,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color.fromARGB(255, 0, 0, 0),
+                                  ),
+                                  textAlign:
+                                      TextAlign.center, // Align text center
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.keyboard_arrow_down,
+                                  ),
+                                  iconSize: 50,
+                                  color: const Color.fromRGBO(236, 145, 32, 1),
+                                  onPressed: () {
+                                    Navigator.of(context)
+                                        .pop(); // Navigate back
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          viewModel.studentProfile?.studentGrade ?? '',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Color.fromRGBO(236, 145, 32, 1),
-                          ),
+
+                        // Placeholder to balance alignment
+                        const SizedBox(
+                          width: 48,
+                          height: 200,
                         ),
-                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
@@ -147,6 +181,7 @@ class GradeTile extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // Text Section
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -154,31 +189,37 @@ class GradeTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // Subject Name
                   Text(
                     subjectName,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontFamily: "Arial",
+                      fontSize: 24,
                       fontWeight: FontWeight.w800,
                     ),
+                    overflow: TextOverflow.ellipsis, // Prevent overflow
+                    maxLines: 1, // Limit to 1 line
                   ),
-                  const SizedBox(height: 4),
+
+                  // Professor Name
                   Text(
                     professor,
                     style: const TextStyle(
                       fontSize: 18,
                       color: Color.fromRGBO(113, 113, 113, 1),
+                      fontWeight: FontWeight.w400,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: TextOverflow.ellipsis, // Prevent overflow
+                    maxLines: 1, // Limit to 1 line
                   ),
                 ],
               ),
             ),
           ),
 
-          //gradebox
+          // Grade Box
           Container(
-            width: 70, // stalna duljina za ocjenu
+            width: 85, // Fixed width for the grade box
             decoration: const BoxDecoration(
               color: Color.fromRGBO(23, 148, 210, 1),
               borderRadius: BorderRadius.only(
@@ -190,7 +231,7 @@ class GradeTile extends StatelessWidget {
             child: Text(
               grade,
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 30,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),

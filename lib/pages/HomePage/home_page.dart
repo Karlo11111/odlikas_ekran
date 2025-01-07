@@ -3,6 +3,7 @@ import 'package:odlikas_ekran/pages/HomePage/widgets/grade_wheel.dart';
 import 'package:odlikas_ekran/responsive.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/home_page_viewmodel.dart';
+import 'package:lottie/lottie.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -28,7 +29,14 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       body: viewModel.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Lottie.asset(
+                'assets/animations/bird_animation.json',
+                width: 150,
+                height: 150,
+                fit: BoxFit.contain,
+              ),
+            )
           : viewModel.grades != null
               ? Center(
                   child: Stack(

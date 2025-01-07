@@ -4,6 +4,8 @@ class StudentProfile {
   final String studentSchoolYear;
   final String studentGrade;
   final String studentName;
+  final String studentProgram;
+  final String classMaster;
 
   StudentProfile({
     required this.studentSchool,
@@ -11,6 +13,8 @@ class StudentProfile {
     required this.studentSchoolYear,
     required this.studentGrade,
     required this.studentName,
+    required this.studentProgram,
+    required this.classMaster,
   });
 
   // Factory method to create a StudentProfile from JSON
@@ -22,6 +26,8 @@ class StudentProfile {
       studentSchoolYear: profile['studentSchoolYear'] ?? '',
       studentGrade: profile['studentGrade'] ?? '',
       studentName: profile['studentName'] ?? '',
+      studentProgram: profile['studentProgram'] ?? '',
+      classMaster: profile['classMaster'] ?? '',
     );
   }
 }
