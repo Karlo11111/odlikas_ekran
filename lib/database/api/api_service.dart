@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:odlikas_ekran/models/grades.dart';
+import 'package:odlikas_ekran/models/specific_subject.dart';
 import 'package:odlikas_ekran/models/student_profile.dart';
 
 class ApiService {
@@ -35,10 +36,47 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      print(data);
-      return Grades.fromJson(data); // Ensure this is correctly mapping the data
+      return Grades.fromJson(data);
     } else {
       throw Exception('Failed to fetch grades');
+    }
+  }
+
+  Future<List<MonthlyGrades>> fetchSpecificSubjectGrades(
+      String email, String password, String subjectId) async {
+    final url = Uri.parse(
+        '$baseUrl/api/Scraper/ScrapeSpecificSubjectGrades?subjectId=$subjectId');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'Email': email, 'Password': password}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return (data as List)
+          .map((month) => MonthlyGrades.fromJson(month))
+          .toList();
+    } else {
+      throw Exception('Failed to fetch specific subject grades');
+    }
+  }
+
+  Future<SubjectDetails> fetchSpecificSubjectDetails(
+      String email, String password, String subjectId) async {
+    final url = Uri.parse(
+        '$baseUrl/api/scraper/ScrapeSpecificSubjectGrades?subjectId=$subjectId');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'Email': email, 'Password': password}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return SubjectDetails.fromJson(data);
+    } else {
+      throw Exception('Failed to fetch specific subject details');
     }
   }
 }

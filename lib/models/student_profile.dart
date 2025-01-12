@@ -17,7 +17,7 @@ class StudentProfile {
     required this.classMaster,
   });
 
-  // Factory method to create a StudentProfile from JSON
+  // kreiranje StudentProfila iz json-a koji fetcha api
   factory StudentProfile.fromJson(Map<String, dynamic> json) {
     final profile = json['studentProfile'] ?? {};
     return StudentProfile(

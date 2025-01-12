@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odlikas_ekran/pages/SpecificSubject/specific_subject_page.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/home_page_viewmodel.dart';
 import 'package:lottie/lottie.dart';
@@ -41,11 +42,9 @@ class _GradesPageState extends State<GradesPage> {
                 // da je app bar scrollable
                 SliverToBoxAdapter(
                   child: Container(
-                    color: const Color.fromRGBO(
-                        255, 255, 255, 1), // Background color
+                    color: const Color.fromRGBO(255, 255, 255, 1),
                     padding: EdgeInsets.symmetric(
-                      horizontal: MediaQuery.of(context).size.width *
-                          0.04, // Adjust padding
+                      horizontal: MediaQuery.of(context).size.width * 0.04,
                       vertical: 16.0,
                     ),
                     child: Row(
@@ -67,17 +66,26 @@ class _GradesPageState extends State<GradesPage> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const SizedBox(height: 16),
-                            Text(
-                              viewModel.studentProfile?.studentProgram ??
-                                  "Loading...",
-                              style: TextStyle(
-                                fontSize:
-                                    MediaQuery.of(context).size.width * 0.03,
-                                fontWeight: FontWeight.bold,
+
+                            // Wrap the *first* text in a width-constrained Container
+                            SizedBox(
+                              width: MediaQuery.of(context).size.width * 0.8,
+                              // adjust 0.4 if you want more or less space
+                              child: Text(
+                                viewModel.studentProfile?.studentProgram ??
+                                    "Loading...",
+                                style: TextStyle(
+                                  fontSize:
+                                      MediaQuery.of(context).size.width * 0.03,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              textAlign: TextAlign.center, // Align text center
                             ),
-                            const SizedBox(height: 4), // Space between texts
+
+                            const SizedBox(height: 4),
                             Text(
                               "Razrednik/ca: ${viewModel.studentProfile?.classMaster ?? ''}",
                               style: TextStyle(
@@ -86,35 +94,52 @@ class _GradesPageState extends State<GradesPage> {
                                 fontWeight: FontWeight.normal,
                                 color: const Color.fromRGBO(113, 113, 113, 1),
                               ),
-                              textAlign: TextAlign.center, // Align text center
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(
+                              height: MediaQuery.of(context).size.width * 0.009,
                             ),
 
-                            Row(
-                              children: [
-                                Text(
-                                  viewModel.studentProfile?.studentGrade ?? '',
-                                  style: TextStyle(
-                                    fontSize:
-                                        MediaQuery.of(context).size.width *
-                                            0.035,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color.fromARGB(255, 0, 0, 0),
-                                  ),
-                                  textAlign:
-                                      TextAlign.center, // Align text center
+                            // The grade dropdown container you do NOT want to change
+                            Container(
+                              padding: EdgeInsets.only(
+                                left: MediaQuery.of(context).size.width * 0.01,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: const Color.fromRGBO(234, 234, 234, 1),
+                                  width: 2,
                                 ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.keyboard_arrow_down,
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    (viewModel.studentProfile?.studentGrade ??
+                                                '')
+                                            .isNotEmpty
+                                        ? '${viewModel.studentProfile?.studentGrade[0]}.${viewModel.studentProfile?.studentGrade.substring(1)}'
+                                        : '',
+                                    style: TextStyle(
+                                      fontSize:
+                                          MediaQuery.of(context).size.width *
+                                              0.035,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color.fromARGB(255, 0, 0, 0),
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
-                                  iconSize: 50,
-                                  color: const Color.fromRGBO(236, 145, 32, 1),
-                                  onPressed: () {
-                                    Navigator.of(context)
-                                        .pop(); // Navigate back
-                                  },
-                                ),
-                              ],
+                                  IconButton(
+                                    icon: const Icon(Icons.keyboard_arrow_down),
+                                    iconSize: 50,
+                                    color:
+                                        const Color.fromRGBO(236, 145, 32, 1),
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -148,6 +173,7 @@ class _GradesPageState extends State<GradesPage> {
                           subjectName: subject.subjectName,
                           professor: subject.professor,
                           grade: subject.grade,
+                          subjectId: subject.subjectId,
                         );
                       },
                       childCount: viewModel.grades?.subjects.length ?? 0,
@@ -164,9 +190,11 @@ class GradeTile extends StatelessWidget {
   final String subjectName;
   final String professor;
   final String grade;
+  final String subjectId;
 
   const GradeTile({
     Key? key,
+    required this.subjectId,
     required this.subjectName,
     required this.professor,
     required this.grade,
@@ -174,70 +202,79 @@ class GradeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color.fromRGBO(234, 234, 234, 1),
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Row(
-        children: [
-          // Text Section
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Subject Name
-                  Text(
-                    subjectName,
-                    style: const TextStyle(
-                      fontFamily: "Arial",
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    overflow: TextOverflow.ellipsis, // Prevent overflow
-                    maxLines: 1, // Limit to 1 line
-                  ),
-
-                  // Professor Name
-                  Text(
-                    professor,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: Color.fromRGBO(113, 113, 113, 1),
-                      fontWeight: FontWeight.w400,
-                    ),
-                    overflow: TextOverflow.ellipsis, // Prevent overflow
-                    maxLines: 1, // Limit to 1 line
-                  ),
-                ],
-              ),
-            ),
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => SubjectDetailsPage(subjectId: subjectId),
           ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color.fromRGBO(234, 234, 234, 1),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          children: [
+            // Text Section
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Subject Name
+                    Text(
+                      subjectName,
+                      style: const TextStyle(
+                        fontFamily: "Arial",
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      overflow: TextOverflow.ellipsis, // Prevent overflow
+                      maxLines: 1, // Limit to 1 line
+                    ),
 
-          // Grade Box
-          Container(
-            width: 85, // Fixed width for the grade box
-            decoration: const BoxDecoration(
-              color: Color.fromRGBO(23, 148, 210, 1),
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(15),
-                bottomRight: Radius.circular(15),
+                    // Professor Name
+                    Text(
+                      professor,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        color: Color.fromRGBO(113, 113, 113, 1),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      overflow: TextOverflow.ellipsis, // Prevent overflow
+                      maxLines: 1, // Limit to 1 line
+                    ),
+                  ],
+                ),
               ),
             ),
-            alignment: Alignment.center,
-            child: Text(
-              grade,
-              style: const TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+
+            // Grade Box
+            Container(
+              width: 85, // Fixed width for the grade box
+              decoration: const BoxDecoration(
+                color: Color.fromRGBO(23, 148, 210, 1),
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(15),
+                  bottomRight: Radius.circular(15),
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                grade,
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

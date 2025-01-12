@@ -16,7 +16,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Fetch data when the homepage is loaded
+    // fetchaj podatke nakon sto se widget (home page) postavi
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final viewModel = context.read<HomePageViewModel>();
       viewModel.fetchGrades("karlo.ciciliani@skole.hr", "2kw3xpAS");
