@@ -4,7 +4,7 @@ import 'package:odlikas_ekran/models/grades.dart';
 import 'package:odlikas_ekran/pages/SpecificSubject/widgets/evaluation_table.dart';
 import 'package:odlikas_ekran/pages/SpecificSubject/widgets/notes_table.dart';
 import 'package:odlikas_ekran/pages/SpecificSubject/widgets/zakljuceno_row.dart';
-import 'package:odlikas_ekran/viewmodels/home_page_viewmodel.dart';
+import 'package:odlikas_ekran/viewmodels/viewmodel.dart';
 import 'package:provider/provider.dart';
 
 class SubjectDetailsPage extends StatefulWidget {

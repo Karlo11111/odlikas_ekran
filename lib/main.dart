@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:odlikas_ekran/pages/Calendar/calendar_page.dart';
 import 'package:odlikas_ekran/pages/Grades/grades_page.dart';
+import 'package:odlikas_ekran/viewmodels/test_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'database/firebase_options.dart';
 import 'database/api/api_service.dart';
-import 'viewmodels/home_page_viewmodel.dart';
+import 'viewmodels/viewmodel.dart';
 import 'pages/HomePage/home_page.dart';
 import 'pages/SetupPage/setup_page.dart';
 import 'pages/QRCodePage/qr_code_page.dart';
@@ -62,8 +64,12 @@ class MyApp extends StatelessWidget {
         // Provide HomePageViewModel and connect it to ApiService
         ChangeNotifierProxyProvider<ApiService, HomePageViewModel>(
           create: (context) => HomePageViewModel(context.read<ApiService>()),
-          update: (_, apiService, previous) =>
-              previous ?? HomePageViewModel(apiService),
+          update: (_, apiService, previous) => HomePageViewModel(apiService),
+        ),
+
+        ChangeNotifierProxyProvider<ApiService, TestViewmodel>(
+          create: (context) => TestViewmodel(context.read<ApiService>()),
+          update: (_, apiService, previous) => TestViewmodel(apiService),
         ),
       ],
       child: MaterialApp(
@@ -73,7 +79,8 @@ class MyApp extends StatelessWidget {
           '/setup': (context) => const SetupScreen(),
           '/qr': (context) => QRCodePage(screenId: screenId),
           '/home': (context) => HomePage(),
-          '/grades': (context) => GradesPage(),
+          '/grades': (context) => const GradesPage(),
+          '/calendar': (context) => CalendarPage(),
         },
       ),
     );

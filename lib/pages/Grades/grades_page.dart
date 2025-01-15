@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:odlikas_ekran/pages/SpecificSubject/specific_subject_page.dart';
 import 'package:provider/provider.dart';
-import '../../viewmodels/home_page_viewmodel.dart';
+import '../../viewmodels/viewmodel.dart';
 import 'package:lottie/lottie.dart';
 
 class GradesPage extends StatefulWidget {
@@ -179,6 +179,9 @@ class _GradesPageState extends State<GradesPage> {
                       childCount: viewModel.grades?.subjects.length ?? 0,
                     ),
                   ),
+                ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 50),
                 ),
               ],
             ),

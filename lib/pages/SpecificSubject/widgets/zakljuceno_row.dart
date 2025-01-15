@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:odlikas_ekran/viewmodels/home_page_viewmodel.dart';
+import 'package:odlikas_ekran/viewmodels/viewmodel.dart';
 
 class ZakljucenoRow extends StatelessWidget {
   const ZakljucenoRow({super.key, required this.viewModel});
@@ -12,11 +12,11 @@ class ZakljucenoRow extends StatelessWidget {
     double _calculateAverageGrade(HomePageViewModel viewModel) {
       final List<double> allGrades = [];
 
-      // Loop through each evaluation element
+      // prodi kroz svaki element ocjenjivanja
       for (final element in viewModel.evaluationElements!) {
-        // Each element may have multiple grades (one per month)
+        // svaki element ima ocjene po mjesecima
         for (final gradeString in element.gradesByMonth) {
-          // Skip empty strings; parse the rest to double
+          // preskoci prazne ocjene
           if (gradeString.isNotEmpty) {
             final parsed = double.tryParse(gradeString);
             if (parsed != null) {
@@ -26,21 +26,19 @@ class ZakljucenoRow extends StatelessWidget {
         }
       }
 
-      // If there are no valid grades, return 0 (or handle however you prefer)
       if (allGrades.isEmpty) {
-        return 0.0;
+        return 0;
       }
 
-      // Sum all valid grades and divide by count
+      // kalkulacija prosjeka ocjena
       final sum = allGrades.reduce((a, b) => a + b);
       return sum / allGrades.length;
     }
 
     return Row(
       children: [
-        // LEFT side: the "ZAKLJUČENO" text and bottom-left radius
         Expanded(
-          flex: 5, // Matches the first column's width
+          flex: 5, // OMJERI SIRINE REDAKA
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(
@@ -81,7 +79,7 @@ class ZakljucenoRow extends StatelessWidget {
           ),
         ),
         Expanded(
-          flex: 6, // Matches the first column's width
+          flex: 6, // OMJERI REDAKA
           child: Container(
             decoration: BoxDecoration(
               border: Border.all(
@@ -120,10 +118,8 @@ class ZakljucenoRow extends StatelessWidget {
             ),
           ),
         ),
-
-        // RIGHT side: an empty container that finishes the bottom border
         Expanded(
-          flex: 4, // 1 for each of the other 10 columns
+          flex: 4, //prazni stupci
           child: Container(),
         ),
       ],

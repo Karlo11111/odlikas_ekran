@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:odlikas_ekran/models/grades.dart';
 import 'package:odlikas_ekran/models/specific_subject.dart';
 import 'package:odlikas_ekran/models/student_profile.dart';
+import 'package:odlikas_ekran/models/tests.dart';
 
 class ApiService {
   final String baseUrl;
@@ -75,6 +76,22 @@ class ApiService {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return SubjectDetails.fromJson(data);
+    } else {
+      throw Exception('Failed to fetch specific subject details');
+    }
+  }
+
+  Future<Tests> fetchTestsDetails(String email, String password) async {
+    final url = Uri.parse('$baseUrl/api/scraper/ScrapeTests');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'Email': email, 'Password': password}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return Tests.fromJson(data);
     } else {
       throw Exception('Failed to fetch specific subject details');
     }

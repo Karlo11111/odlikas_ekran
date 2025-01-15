@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:odlikas_ekran/pages/HomePage/widgets/grade_wheel.dart';
 import 'package:odlikas_ekran/responsive.dart';
 import 'package:provider/provider.dart';
-import '../../viewmodels/home_page_viewmodel.dart';
+import '../../viewmodels/viewmodel.dart';
 import 'package:lottie/lottie.dart';
 
 class HomePage extends StatefulWidget {
@@ -57,10 +57,13 @@ class _HomePageState extends State<HomePage> {
                     Positioned(
                       left: MediaQuery.of(context).size.width * 0.02,
                       bottom: MediaQuery.of(context).size.height * 0.02,
-                      child: _buildContainer(
-                        label: "KALENDAR",
-                        width: MediaQuery.of(context).size.width * 0.47,
-                        height: MediaQuery.of(context).size.height * 0.463,
+                      child: InkWell(
+                        onTap: () => Navigator.pushNamed(context, '/calendar'),
+                        child: _buildContainer(
+                          label: "KALENDAR",
+                          width: MediaQuery.of(context).size.width * 0.47,
+                          height: MediaQuery.of(context).size.height * 0.463,
+                        ),
                       ),
                     ),
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:odlikas_ekran/viewmodels/home_page_viewmodel.dart';
+import 'package:odlikas_ekran/viewmodels/viewmodel.dart';
 
 class NotesTable extends StatelessWidget {
   final HomePageViewModel viewModel;
@@ -19,7 +19,7 @@ class NotesTable extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Orange Header
+        // narančasti header
         Table(
           columnWidths: const {0: FlexColumnWidth()},
           children: [
@@ -49,9 +49,8 @@ class NotesTable extends StatelessWidget {
           ],
         ),
 
-        // Data Rows
+        // retci s podatcima
         Table(
-          // Keep the bottom border so you still see the line under the table
           border: const TableBorder(
             left:
                 BorderSide(color: Color.fromRGBO(113, 113, 113, 1), width: 0.4),
@@ -83,7 +82,7 @@ class NotesTable extends StatelessWidget {
                   ),
                   _buildNotesCellWithRadius(
                     notes[i].grade,
-                    null, // Middle cell doesn't need rounding
+                    null,
                   ),
                   _buildNotesCellWithRadius(
                     notes[i].gradeNote,
@@ -101,8 +100,6 @@ class NotesTable extends StatelessWidget {
     );
   }
 
-  // The key fix: wrap the contents in a ClipRRect so it clips away
-  // the table’s bottom border behind the rounded corners.
   Widget _buildNotesCellWithRadius(String text, BorderRadius? borderRadius) {
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.zero,

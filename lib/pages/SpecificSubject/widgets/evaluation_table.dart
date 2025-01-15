@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:odlikas_ekran/viewmodels/home_page_viewmodel.dart';
+import 'package:odlikas_ekran/viewmodels/viewmodel.dart';
 
 class EvaluationTable extends StatelessWidget {
   const EvaluationTable({super.key, required this.viewModel});
@@ -10,7 +10,7 @@ class EvaluationTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Table(
-      // Table border for top part only
+      // table border samo za gornji dio
       border: TableBorder.all(
         color: const Color.fromRGBO(113, 113, 113, 1),
         width: 0.4,
@@ -20,8 +20,8 @@ class EvaluationTable extends StatelessWidget {
         ),
       ),
       columnWidths: const {
-        // Same ratio you'll use below for the Row
-        0: FlexColumnWidth(5), // For the "OCJENE" and element names
+        // omjeri duljina stupaca
+        0: FlexColumnWidth(5), // za ocjene siri stupac
         1: FlexColumnWidth(1),
         2: FlexColumnWidth(1),
         3: FlexColumnWidth(1),
@@ -57,7 +57,7 @@ class EvaluationTable extends StatelessWidget {
             _buildTableHeaderCell("VI", false),
           ],
         ),
-        // Table Rows
+        // redovi tablice
         ...viewModel.evaluationElements!.map((element) {
           return TableRow(
             children: [
@@ -88,7 +88,7 @@ class EvaluationTable extends StatelessWidget {
     );
   }
 
-  /// Table Body Cells
+  // celije tablice
   Widget _buildTableCell(String text) {
     return Container(
       alignment: Alignment.center,
