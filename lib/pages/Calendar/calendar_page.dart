@@ -16,6 +16,8 @@ class CalendarPage extends StatefulWidget {
 }
 
 class _CalendarPageState extends State<CalendarPage> {
+  late Future<void> _initialDataLoad;
+
   DateTime _focusedDate = DateTime.now();
   late DateTime _firstDayOfMonth;
   late DateTime _lastDayOfMonth;
@@ -50,12 +52,17 @@ class _CalendarPageState extends State<CalendarPage> {
   void initState() {
     super.initState();
     _updateMonth(_focusedDate);
-    _fetchHolidays();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final viewModel = context.read<TestViewmodel>();
-      viewModel.fetchTests("karlo.ciciliani@skole.hr", "2kw3xpAS");
-    });
+    // Fetch all required data during initialization
+    _initialDataLoad = _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    await _fetchHolidays();
+
+    // Fetch tests through the ViewModel
+    final viewModel = context.read<TestViewmodel>();
+    await viewModel.fetchTests("karlo.ciciliani@skole.hr", "2kw3xpAS");
   }
 
   Future<void> _fetchHolidays() async {
@@ -153,6 +160,12 @@ class _CalendarPageState extends State<CalendarPage> {
       }
 
       return false; // No match found
+    }
+
+    if (viewModel.tests == null && !viewModel.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        viewModel.fetchTests("karlo.ciciliani@skole.hr", "2kw3xpAS");
+      });
     }
 
     return Scaffold(
@@ -317,6 +330,7 @@ class _CalendarPageState extends State<CalendarPage> {
                             DateTime day = _calculateDayForCell(index);
 
                             return DayCell(
+                              onTap: () => _showDayDetailsPopup(context, day),
                               date: day,
                               isWithinCurrentMonth: _isWithinCurrentMonth(day),
                               isHoliday: _isHoliday(day),
@@ -335,9 +349,170 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
+  void _showDayDetailsPopup(BuildContext context, DateTime date) {
+    final viewModel = context.read<TestViewmodel>();
+
+    // Get tests for the selected date
+    List<Map<String, String>> tests = [];
+    if (viewModel.tests != null) {
+      for (var monthTests in viewModel.tests!.testsByMonth.values) {
+        for (var test in monthTests) {
+          if (test.testDate.isNotEmpty && test.testDate.contains('.')) {
+            final dateParts = test.testDate.split('.');
+            if (dateParts.length >= 2) {
+              final day = int.parse(dateParts[0]);
+              final month = int.parse(dateParts[1]);
+              final testDate = DateTime(date.year, month, day);
+
+              if (testDate.year == date.year &&
+                  testDate.month == date.month &&
+                  testDate.day == date.day) {
+                tests.add({
+                  'name': test.testName,
+                  'description': test.testDescription,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // prikazi popup screen
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          contentPadding: EdgeInsets.zero,
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.56,
+            height: MediaQuery.of(context).size.height * 0.3,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // gornji dio - ime mjeseca
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 16),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Color.fromRGBO(113, 113, 113, 0.2),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      _monthNames[date.month - 1].toUpperCase(),
+                      style: GoogleFonts.inter(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+
+                  // sredjni dio - datum i detalji ispita
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 24, horizontal: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // DATUM
+                        Text(
+                          "${date.day}.${date.month}.",
+                          style: GoogleFonts.inter(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+
+                        // TEST
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (tests.isNotEmpty)
+                              Text(
+                                tests[0]['name']!,
+                                style: GoogleFonts.inter(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            if (tests.isNotEmpty)
+                              Text(
+                                tests[0]['description']!,
+                                style: GoogleFonts.inter(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.black,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // donji dio - dodaj događaj u kalendar
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          color: Color.fromRGBO(113, 113, 113, 0.2),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.add,
+                          color: Color.fromRGBO(113, 113, 113, 1),
+                          size: 34,
+                        ),
+                        const SizedBox(width: 30),
+                        Text(
+                          "Dodaj događaj u kalendar",
+                          style: GoogleFonts.inter(
+                            fontSize: 24,
+                            fontWeight: FontWeight.normal,
+                            color: const Color.fromRGBO(113, 113, 113, 1),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   DateTime _calculateDayForCell(int index) {
     // Calculate first day to display in the grid
-    int leadingDays = _firstDayOfMonth.weekday - 1; // Adjust for Monday-start
+    int leadingDays = _firstDayOfMonth.weekday - 1;
     return _firstDayOfMonth
         .subtract(Duration(days: leadingDays))
         .add(Duration(days: index));
