@@ -1,6 +1,11 @@
+// ignore_for_file: unused_field, unused_local_variable, library_private_types_in_public_api
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 import 'package:odlikas_ekran/pages/SpecificSubject/specific_subject_page.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../viewmodels/viewmodel.dart';
 import 'package:lottie/lottie.dart';
 
@@ -12,13 +17,83 @@ class GradesPage extends StatefulWidget {
 }
 
 class _GradesPageState extends State<GradesPage> {
+  String? _email;
+  String? _password;
+
+  Future<void> _fetchCredentialsAndGrades() async {
+    final prefs = await SharedPreferences.getInstance();
+    final screenId = prefs.getString('screenId');
+
+    if (screenId == null) {
+      debugPrint('No screen ID found');
+      return;
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('CreatedScreens')
+          .doc(screenId)
+          .get();
+
+      if (doc.exists) {
+        final fetchedEmail = doc.get('linkedUser') as String?;
+        final fetchedPassword = doc.get('password') as String?;
+
+        if (fetchedEmail != null && fetchedPassword != null) {
+          // Update local state
+          setState(() {
+            _email = fetchedEmail;
+            _password = fetchedPassword;
+          });
+
+          // Save to Hive for next time
+          final box = await Hive.openBox('user_credentials');
+          await box.put('email', fetchedEmail);
+          await box.put('password', fetchedPassword);
+
+          // Now fetch the grades
+          _fetchGradesFromViewModel(fetchedEmail, fetchedPassword);
+        }
+      }
+    } catch (e) {
+      print('Error fetching credentials: $e');
+    }
+  }
+
+  void _fetchGradesFromViewModel(String email, String password) {
+    final viewModel = context.read<HomePageViewModel>();
+    viewModel.fetchGrades(email, password);
+    viewModel.fetchStudentProfile(email, password);
+  }
+
+  Future<void> _initFromHive() async {
+    // 1) Open (or create) your Hive box
+    final box = await Hive.openBox('user_credentials');
+
+    // 2) Attempt to read stored credentials
+    final storedEmail = box.get('email') as String?;
+    final storedPassword = box.get('password') as String?;
+
+    if (storedEmail != null && storedPassword != null) {
+      // We have them locally, so set state and fetch the grades
+      setState(() {
+        _email = storedEmail;
+        _password = storedPassword;
+      });
+
+      _fetchGradesFromViewModel(storedEmail, storedPassword);
+    } else {
+      // No credentials in Hive, fall back to Firebase
+      debugPrint('No credentials found in Hive. Fetching from Firebase...');
+      await _fetchCredentialsAndGrades(); // the Firebase version
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final viewModel = context.read<HomePageViewModel>();
-      viewModel.fetchStudentProfile("karlo.ciciliani@skole.hr", "2kw3xpAS");
-      viewModel.fetchGrades("karlo.ciciliani@skole.hr", "2kw3xpAS");
+      _initFromHive();
     });
   }
 
@@ -57,23 +132,19 @@ class _GradesPageState extends State<GradesPage> {
                           iconSize: 50,
                           color: const Color.fromRGBO(236, 145, 32, 1),
                           onPressed: () {
-                            Navigator.of(context).pop(); // Navigate back
+                            Navigator.of(context).pop();
                           },
                         ),
 
-                        // Program and Razrednik/ca stacked vertically
+                        // Program i Razrednik/ca u stupcu
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const SizedBox(height: 16),
-
-                            // Wrap the *first* text in a width-constrained Container
                             SizedBox(
                               width: MediaQuery.of(context).size.width * 0.8,
-                              // adjust 0.4 if you want more or less space
                               child: Text(
-                                viewModel.studentProfile?.studentProgram ??
-                                    "Loading...",
+                                viewModel.studentProfile?.studentProgram ?? "",
                                 style: TextStyle(
                                   fontSize:
                                       MediaQuery.of(context).size.width * 0.03,
@@ -86,6 +157,8 @@ class _GradesPageState extends State<GradesPage> {
                             ),
 
                             const SizedBox(height: 4),
+
+                            // razrednica text
                             Text(
                               "Razrednik/ca: ${viewModel.studentProfile?.classMaster ?? ''}",
                               style: TextStyle(
@@ -100,10 +173,12 @@ class _GradesPageState extends State<GradesPage> {
                               height: MediaQuery.of(context).size.width * 0.009,
                             ),
 
-                            // The grade dropdown container you do NOT want to change
+                            // razred ucenika
                             Container(
                               padding: EdgeInsets.only(
-                                left: MediaQuery.of(context).size.width * 0.01,
+                                left: MediaQuery.of(context).size.width * 0.015,
+                                right:
+                                    MediaQuery.of(context).size.width * 0.015,
                               ),
                               decoration: BoxDecoration(
                                 border: Border.all(
@@ -112,39 +187,22 @@ class _GradesPageState extends State<GradesPage> {
                                 ),
                                 borderRadius: BorderRadius.circular(15),
                               ),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    (viewModel.studentProfile?.studentGrade ??
-                                                '')
-                                            .isNotEmpty
-                                        ? '${viewModel.studentProfile?.studentGrade[0]}.${viewModel.studentProfile?.studentGrade.substring(1)}'
-                                        : '',
-                                    style: TextStyle(
-                                      fontSize:
-                                          MediaQuery.of(context).size.width *
-                                              0.035,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color.fromARGB(255, 0, 0, 0),
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.keyboard_arrow_down),
-                                    iconSize: 50,
-                                    color:
-                                        const Color.fromRGBO(236, 145, 32, 1),
-                                    onPressed: () {
-                                      Navigator.of(context).pop();
-                                    },
-                                  ),
-                                ],
+                              child: Text(
+                                (viewModel.studentProfile?.studentGrade ?? '')
+                                        .isNotEmpty
+                                    ? '${viewModel.studentProfile?.studentGrade[0]}.${viewModel.studentProfile?.studentGrade.substring(1)}'
+                                    : '',
+                                style: TextStyle(
+                                  fontSize:
+                                      MediaQuery.of(context).size.width * 0.035,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color.fromARGB(255, 0, 0, 0),
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ],
                         ),
-
-                        // Placeholder to balance alignment
                         const SizedBox(
                           width: 48,
                           height: 200,
@@ -236,8 +294,8 @@ class GradeTile extends StatelessWidget {
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                       ),
-                      overflow: TextOverflow.ellipsis, // Prevent overflow
-                      maxLines: 1, // Limit to 1 line
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1, // Limit na 1 liniju
                     ),
 
                     // Professor Name
@@ -248,8 +306,8 @@ class GradeTile extends StatelessWidget {
                         color: Color.fromRGBO(113, 113, 113, 1),
                         fontWeight: FontWeight.w400,
                       ),
-                      overflow: TextOverflow.ellipsis, // Prevent overflow
-                      maxLines: 1, // Limit to 1 line
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1, // Limit na 1 liniju
                     ),
                   ],
                 ),
@@ -258,7 +316,7 @@ class GradeTile extends StatelessWidget {
 
             // Grade Box
             Container(
-              width: 85, // Fixed width for the grade box
+              width: 85,
               decoration: const BoxDecoration(
                 color: Color.fromRGBO(23, 148, 210, 1),
                 borderRadius: BorderRadius.only(

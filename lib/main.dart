@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:odlikas_ekran/pages/Calendar/calendar_page.dart';
 import 'package:odlikas_ekran/pages/Grades/grades_page.dart';
+import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.dart';
+import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_galery.dart';
+import 'package:odlikas_ekran/pages/PomodoroTimer/pomodoro_timer_page.dart';
 import 'package:odlikas_ekran/viewmodels/test_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:hive_flutter/hive_flutter.dart';
 import 'database/firebase_options.dart';
 import 'database/api/api_service.dart';
 import 'viewmodels/viewmodel.dart';
@@ -17,6 +20,10 @@ import 'pages/QRCodePage/qr_code_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await Hive.initFlutter();
+  Hive.registerAdapter(WhiteboardDataAdapter());
+  await Hive.openBox<WhiteboardData>('whiteboards');
 
   // Lock orientation to landscape mode
   await SystemChrome.setPreferredOrientations([
@@ -80,7 +87,9 @@ class MyApp extends StatelessWidget {
           '/qr': (context) => QRCodePage(screenId: screenId),
           '/home': (context) => HomePage(),
           '/grades': (context) => const GradesPage(),
-          '/calendar': (context) => CalendarPage(),
+          '/calendar': (context) => const CalendarPage(),
+          '/pomodoro': (context) => const PomodoroTimerPage(),
+          '/photomath': (context) => const WhiteboardGalleryPage(),
         },
       ),
     );
