@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:odlikas_ekran/pages/Calendar/calendar_page.dart';
 import 'package:odlikas_ekran/pages/Grades/grades_page.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.dart';
@@ -9,13 +10,13 @@ import 'package:odlikas_ekran/viewmodels/test_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'database/firebase_options.dart';
 import 'database/api/api_service.dart';
 import 'viewmodels/viewmodel.dart';
 import 'pages/HomePage/home_page.dart';
 import 'pages/SetupPage/setup_page.dart';
 import 'pages/QRCodePage/qr_code_page.dart';
+import 'package:hive_flutter/adapters.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +40,8 @@ void main() async {
   final setupDone = prefs.getBool('setupDone') ?? false;
   final String screenId = prefs.getString('screenId') ?? '';
   final connectedOnce = prefs.getBool('connectedOnce') ?? false;
+
+  await dotenv.load(fileName: ".env");
 
   runApp(MyApp(
     setupDone: setupDone,

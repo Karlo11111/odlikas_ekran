@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class PomodoroTimerPage extends StatelessWidget {
-  const PomodoroTimerPage({super.key});
+class SolutionStepsPages extends StatelessWidget {
+  const SolutionStepsPages({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +37,7 @@ class PomodoroTimerPage extends StatelessWidget {
                     children: [
                       const SizedBox(height: 20),
                       Text(
-                        "Matematicke biljeske",
+                        "Koraci rješenja",
                         style: GoogleFonts.inter(
                             fontSize: 36, fontWeight: FontWeight.w800),
                       ),
@@ -48,7 +48,7 @@ class PomodoroTimerPage extends StatelessWidget {
             ),
           ),
 
-          // POMODORO TIMER
+          // Koraci rjesenja
         ],
       ),
     );

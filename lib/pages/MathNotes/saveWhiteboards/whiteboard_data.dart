@@ -1,6 +1,6 @@
 // whiteboard_data.dart
 import 'package:flutter/services.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_flutter/adapters.dart';
 
 part 'whiteboard_data.g.dart';
 
@@ -27,6 +27,9 @@ class WhiteboardData extends HiveObject {
   @HiveField(6)
   Uint8List? screenshot;
 
+  @HiveField(7, defaultValue: [])
+  List<Map<String, dynamic>> textElements = [];
+
   WhiteboardData({
     required this.id,
     required this.name,
@@ -35,6 +38,7 @@ class WhiteboardData extends HiveObject {
     required this.transformationMatrix,
     required this.currentScale,
     Uint8List? screenshot,
+    this.textElements = const [],
   });
 
   WhiteboardData copyWith({
@@ -45,6 +49,7 @@ class WhiteboardData extends HiveObject {
     List<double>? transformationMatrix,
     double? currentScale,
     Uint8List? screenshot,
+    List<Map<String, dynamic>>? textElements,
   }) {
     return WhiteboardData(
       id: id ?? this.id,
@@ -54,6 +59,7 @@ class WhiteboardData extends HiveObject {
       transformationMatrix: transformationMatrix ?? this.transformationMatrix,
       currentScale: currentScale ?? this.currentScale,
       screenshot: screenshot ?? this.screenshot,
+      textElements: textElements ?? this.textElements,
     );
   }
 }

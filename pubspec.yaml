@@ -52,6 +52,8 @@ dependencies:
   hive_flutter: ^1.1.0
   intl: ^0.20.2
   flutter_dotenv: ^5.2.1
+  flutter_math_fork: ^0.7.3
+  string_extensions: ^0.7.3
 
 
 dev_dependencies:
@@ -76,7 +78,9 @@ flutter:
   assets:
    - assets/images/
    - assets/icons/
+   - .env
    - assets/animations/bird_animation.json
+   - assets/animations/spinning_circle.gif
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

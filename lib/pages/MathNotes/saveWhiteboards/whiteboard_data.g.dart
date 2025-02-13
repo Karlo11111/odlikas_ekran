@@ -25,13 +25,19 @@ class WhiteboardDataAdapter extends TypeAdapter<WhiteboardData> {
           .toList(),
       transformationMatrix: (fields[4] as List).cast<double>(),
       currentScale: fields[5] as double,
+      screenshot: fields[6] as Uint8List?,
+      textElements: fields[7] == null
+          ? []
+          : (fields[7] as List)
+              .map((dynamic e) => (e as Map).cast<String, dynamic>())
+              .toList(),
     );
   }
 
   @override
   void write(BinaryWriter writer, WhiteboardData obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -43,7 +49,11 @@ class WhiteboardDataAdapter extends TypeAdapter<WhiteboardData> {
       ..writeByte(4)
       ..write(obj.transformationMatrix)
       ..writeByte(5)
-      ..write(obj.currentScale);
+      ..write(obj.currentScale)
+      ..writeByte(6)
+      ..write(obj.screenshot)
+      ..writeByte(7)
+      ..write(obj.textElements);
   }
 
   @override

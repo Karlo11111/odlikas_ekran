@@ -8,6 +8,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive/hive.dart';
 import 'package:latext/latext.dart';
 import 'package:odlikas_ekran/database/api/matpix_ai_solving.dart';
+import 'package:odlikas_ekran/database/api/open_ai_service.dart';
+import 'package:odlikas_ekran/pages/MathNotes/TextAdding/text_model.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/debouncer.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/color_width_indicator.dart';
@@ -15,6 +17,7 @@ import 'package:odlikas_ekran/pages/MathNotes/widgets/drawing_path.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/select_rectangle_mathpix.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/tool.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/white_board_painter.dart';
+import 'package:odlikas_ekran/pages/SolutionStepsPage/solution_steps_page.dart';
 import 'package:vector_math/vector_math_64.dart' as vm;
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:typed_data';
@@ -97,8 +100,15 @@ class _MathNotesState extends State<MathNotes> {
   Offset? _selectionEnd;
   GlobalKey _whiteboardKey = GlobalKey();
 
+  //text creating
+  List<TextElement> _textElements = [];
+  TextElement? _selectedTextElement;
+
+  // this is for the ai mathpix image
   Uint8List? _capturedImage;
   String? _latexResult;
+  bool _isOpenAiLoading = false;
+  List<Map<String, String>>? _openAiAnswer;
 
   // spremanje whiteboarda u hive
   late final Box<WhiteboardData> _whiteboardsBox;
@@ -123,7 +133,12 @@ class _MathNotesState extends State<MathNotes> {
     _transformationMatrix = Matrix4.fromList(
       _whiteboardData.transformationMatrix,
     );
+
     _currentScale = _whiteboardData.currentScale;
+
+    _textElements = _whiteboardData.textElements
+        .map((te) => TextElement.fromMap(te))
+        .toList();
   }
 
   Future<void> _autoSave() async {
@@ -135,13 +150,14 @@ class _MathNotesState extends State<MathNotes> {
           transformationMatrix: _transformationMatrix.storage.toList(),
           currentScale: _currentScale,
           lastModified: DateTime.now(),
+          textElements: _textElements.map((te) => te.toMap()).toList(),
         );
 
         // 2) sada uzimamo screenshot whiteboarda i konvertujemo ga u Uint8List(za preview u galeriji)
         final boundary = _whiteboardKey.currentContext?.findRenderObject()
             as RenderRepaintBoundary?;
         if (boundary != null) {
-          final uiImage = await boundary.toImage(pixelRatio: 1.5);
+          final uiImage = await boundary.toImage(pixelRatio: 0.3);
           final byteData =
               await uiImage.toByteData(format: ui.ImageByteFormat.png);
           if (byteData != null) {
@@ -194,17 +210,42 @@ class _MathNotesState extends State<MathNotes> {
               if (image != null) {
                 setState(() => _capturedImage = image);
 
-                // zvanje mathpix ai metode za prepoznavanje slike i slanje slike njima da dobijemo latex rezultate
+                // Send image to Mathpix AI
                 final MathpixAiSolving mathpixAiSolving = MathpixAiSolving();
                 final result = await mathpixAiSolving.sendImageToMathpix(image);
                 if (result != null) {
-                  // moramo uredit latex jer ne dobijemo stopostotno cist rezultat iz mathpixa
+                  // Sanitize the LaTeX result
                   String sanitized =
                       result.replaceAll(r"\(", r"$$").replaceAll(r"\)", r"$$");
 
                   setState(() {
                     _latexResult = sanitized;
                   });
+
+                  // OpenAI service for solving math expressions
+                  setState(() {
+                    _isOpenAiLoading = true;
+                    _openAiAnswer = null;
+                  });
+
+                  final openAiService = OpenAiService();
+                  final openAiResult =
+                      await openAiService.solveMathExpression(sanitized);
+
+                  setState(() {
+                    _isOpenAiLoading = false;
+                  });
+
+                  // Navigate to Solution Steps Page
+                  if (openAiResult != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            SolutionStepsPage(steps: openAiResult),
+                      ),
+                    );
+                  }
                 }
               }
             } finally {
@@ -328,6 +369,21 @@ class _MathNotesState extends State<MathNotes> {
               onScaleStart: _handleScaleStart,
               onScaleUpdate: _handleScaleUpdate,
               onScaleEnd: _handleScaleEnd,
+              onTapDown: (details) {
+                if (_currentTool == ToolMode.text) {
+                  final newElement = TextElement(
+                    id: DateTime.now().microsecondsSinceEpoch.toString(),
+                    position: _transformPoint(details.localPosition),
+                    fontSize: 24, // Store base font size (not scaled)
+                    size: Size(150, 50), // Store base size (not scaled)
+                    isEditing: true,
+                  );
+                  setState(() {
+                    _textElements.add(newElement);
+                    _selectedTextElement = newElement;
+                  });
+                }
+              },
               child: CustomPaint(
                 painter: WhiteboardPainter(
                   paths: _paths,
@@ -340,7 +396,6 @@ class _MathNotesState extends State<MathNotes> {
               ),
             ),
           ),
-
           // return botun
           Positioned(
             top: 25,
@@ -563,8 +618,12 @@ class _MathNotesState extends State<MathNotes> {
                                 : Colors.black),
                       ),
                       ToolButton(
-                        child: const Icon(Icons.text_fields),
-                        onPressed: () {},
+                        isActive: _currentTool == ToolMode.text,
+                        onPressed: () => _changeTool(ToolMode.text),
+                        child: Icon(Icons.text_fields,
+                            color: _currentTool == ToolMode.text
+                                ? const Color.fromRGBO(23, 148, 210, 1)
+                                : Colors.black),
                       ),
                       ToolButton(
                         child: const Icon(Icons.shape_line),
@@ -611,13 +670,13 @@ class _MathNotesState extends State<MathNotes> {
           ),
 
           // panel za prikazivanje latex rezultata (rezultata AI)
-          if (_latexResult != null && _latexResult!.isNotEmpty)
+          if (_isOpenAiLoading)
             Positioned(
               bottom: 0,
-              left: MediaQuery.of(context).size.width / 2 - 290,
+              left: MediaQuery.of(context).size.width / 2 - 300,
               child: Container(
                 width: 600,
-                height: 150,
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
@@ -629,28 +688,53 @@ class _MathNotesState extends State<MathNotes> {
                     ),
                   ],
                 ),
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: SizedBox.expand(
-                      child: SingleChildScrollView(
-                        child: Transform.translate(
-                          offset: Offset(
-                              -MediaQuery.of(context).size.width * 0.15, -40),
-                          child: LaTexT(
-                            laTeXCode: Text(
-                              textAlign: TextAlign.left,
-                              _latexResult!,
-                              style: GoogleFonts.inter(
-                                fontSize: 40,
-                              ),
-                            ),
-                          ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Display the LaTeX result from Mathpix
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: LaTexT(
+                        laTeXCode: Text(
+                          _latexResult!,
+                          textAlign: TextAlign.left,
+                          style: GoogleFonts.inter(fontSize: 40),
                         ),
                       ),
                     ),
-                  ),
+
+                    const SizedBox(height: 16),
+
+                    // Display the spinner if we are still loading the OpenAI answer
+                    if (_isOpenAiLoading) ...[
+                      Image.asset(
+                        'assets/animations/spinning_circle.gif',
+                        width: 100,
+                        height: 100,
+                      ),
+                    ],
+
+                    // Otherwise, display the OpenAI answer (if any)
+                    if (!_isOpenAiLoading && _openAiAnswer != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        _openAiAnswer.toString(),
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+
+                    // Optional: A button to go to another page for more steps
+                    // if (!_isOpenAiLoading && _openAiAnswer != null)
+                    //   ElevatedButton(
+                    //     onPressed: () {
+                    //       // Navigate to a more detailed steps page
+                    //     },
+                    //     child: Text("View Steps"),
+                    //   ),
+                  ],
                 ),
               ),
             ),
@@ -686,7 +770,152 @@ class _MathNotesState extends State<MathNotes> {
             ),
           ),
 
-          //ako je AI tool selektiran, prikazi overlay za selektiranje slike
+          ..._textElements.map((element) {
+            // 1) In board space, the rectangle corners:
+            //    top-left = element.position
+            //    bottom-right = element.position + element.size
+            final Offset boardTopLeft = element.position;
+            final Offset boardBottomRight = element.position +
+                Offset(element.size.width, element.size.height);
+
+            // 2) Convert both corners to screen space:
+            final Offset screenTopLeft = _applyMatrix(boardTopLeft);
+            final Offset screenBottomRight = _applyMatrix(boardBottomRight);
+
+            // 3) The resulting bounding box in screen space:
+            double boxLeft = screenTopLeft.dx;
+            double boxTop = screenTopLeft.dy;
+            double boxRight = screenBottomRight.dx;
+            double boxBottom = screenBottomRight.dy;
+
+            // If your transform can flip coordinates (e.g. negative scaling),
+            // ensure left < right and top < bottom by sorting:
+            if (boxRight < boxLeft) {
+              final temp = boxLeft;
+              boxLeft = boxRight;
+              boxRight = temp;
+            }
+            if (boxBottom < boxTop) {
+              final temp = boxTop;
+              boxTop = boxBottom;
+              boxBottom = temp;
+            }
+
+            final double boxWidth = boxRight - boxLeft;
+            final double boxHeight = boxBottom - boxTop;
+
+            // 4) Derive a scale factor for the font:
+            //    - For simplicity, scale by ratio of screenHeight to boardHeight.
+            //    - If there's no rotation or severe distortion, this is fine.
+            //    - If you do rotate the board, you'd need more advanced handling.
+            double boardHeight = element.size.height;
+            double fontScale =
+                (boardHeight == 0) ? 1 : (boxHeight / boardHeight);
+            if (fontScale.isNaN || fontScale.isInfinite) {
+              fontScale = 1; // fallback if something weird
+            }
+            final double finalFontSize = element.fontSize * fontScale;
+
+            return Positioned(
+              left: boxLeft,
+              top: boxTop,
+              // Use the scaled size in screen coordinates
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+
+                // Select text if user long-presses
+                onLongPress: () {
+                  setState(() {
+                    _selectedTextElement = element;
+                    _currentTool = ToolMode.text;
+                  });
+                },
+
+                // Drag the text in board space
+                onPanUpdate: (details) {
+                  setState(() {
+                    final inverseMatrix =
+                        Matrix4.inverted(_transformationMatrix);
+                    final deltaVec = inverseMatrix.transform3(
+                      vm.Vector3(details.delta.dx, details.delta.dy, 0),
+                    );
+                    element.position += Offset(deltaVec.x, deltaVec.y);
+                  });
+                },
+
+                child: Container(
+                  width: boxWidth,
+                  height: boxHeight,
+                  decoration: BoxDecoration(
+                    border: (_selectedTextElement == element)
+                        ? Border.all(color: Colors.blue, width: 1)
+                        : null,
+                  ),
+                  child: Stack(
+                    children: [
+                      // Editing vs. displayed text
+                      if (element.isEditing)
+                        TextField(
+                          autofocus: true,
+                          style: TextStyle(fontSize: finalFontSize),
+                          onChanged: (value) => element.text = value,
+                          onSubmitted: (value) {
+                            setState(() => element.isEditing = false);
+                          },
+                        )
+                      else
+                        Text(
+                          element.text,
+                          style: TextStyle(fontSize: finalFontSize),
+                        ),
+
+                      // Resize handle if this is the selected text
+                      if (_selectedTextElement == element)
+                        Positioned(
+                          right:
+                              -10, // handle sits partly outside to appear as a corner
+                          bottom: -10,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onPanUpdate: (details) {
+                              setState(() {
+                                final inverseMatrix =
+                                    Matrix4.inverted(_transformationMatrix);
+                                final deltaVec = inverseMatrix.transform3(
+                                  vm.Vector3(
+                                      details.delta.dx, details.delta.dy, 0),
+                                );
+                                // The new size in board coords:
+                                double newW = element.size.width + deltaVec.x;
+                                double newH = element.size.height + deltaVec.y;
+
+                                // Clamp to avoid going negative
+                                if (newW < 20) newW = 20;
+                                if (newH < 20) newH = 20;
+
+                                element.size = Size(newW, newH);
+                                // If you want the "base" font size to track the new height:
+                                element.fontSize = element.size.height * 1.2;
+                              });
+                            },
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+
           if (_isSelectingArea) _buildSelectionOverlay(),
         ],
       ),
@@ -697,6 +926,8 @@ class _MathNotesState extends State<MathNotes> {
   //     SCALE HANDLERS (Handle pinch, pan, and drawing)
   // ----------------------------------------------------------
   void _handleScaleStart(ScaleStartDetails details) {
+    if (_selectedTextElement != null) return;
+
     _lastScale = _currentScale;
     _initialTransformationMatrix = Matrix4.copy(_transformationMatrix);
     _initialGestureFocalPoint = details.localFocalPoint;
@@ -718,11 +949,10 @@ class _MathNotesState extends State<MathNotes> {
 
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (details.scale != 1.0) {
-      // Calculate new scale based on initial scale
+      // Handle zoom scaling
       final newScale = _lastScale * details.scale;
       final clampedScale = newScale.clamp(_minScale, _maxScale);
 
-      // Convert focal point to original coordinate space
       final inverseInitialMatrix =
           Matrix4.inverted(_initialTransformationMatrix);
       final transformedFocal = MatrixUtils.transformPoint(
@@ -730,26 +960,23 @@ class _MathNotesState extends State<MathNotes> {
         _initialGestureFocalPoint,
       );
 
-      // Calculate scale delta relative to initial state
       final scaleDelta = clampedScale / _lastScale;
 
-      // Create new transformation matrix
-      final updatedMatrix = Matrix4.copy(_initialTransformationMatrix)
+      _transformationMatrix = Matrix4.copy(_initialTransformationMatrix)
         ..translate(transformedFocal.dx, transformedFocal.dy)
         ..scale(scaleDelta)
         ..translate(-transformedFocal.dx, -transformedFocal.dy);
 
-      _transformationMatrix = updatedMatrix;
       _currentScale = clampedScale;
       setState(() {});
       _autoSave();
     } else if (_currentTool == ToolMode.hand) {
-      final delta = details.focalPoint - _lastPanOffset!;
+      // Handle panning
+      final delta = details.focalPointDelta;
       _transformationMatrix.translate(
         delta.dx / _currentScale,
         delta.dy / _currentScale,
       );
-      _lastPanOffset = details.focalPoint;
       setState(() {});
       _autoSave();
     } else if (_currentTool == ToolMode.pen) {
@@ -785,10 +1012,16 @@ class _MathNotesState extends State<MathNotes> {
   // ----------------------------------------------------------
   //     Utility Methods
   // ----------------------------------------------------------
-  Offset _transformPoint(Offset point) {
+  Offset _transformPoint(Offset screenOffset) {
     final inverseMatrix = Matrix4.inverted(_transformationMatrix);
-    final transformed =
-        inverseMatrix.transform3(vm.Vector3(point.dx, point.dy, 0));
+    final transformed = inverseMatrix
+        .transform3(vm.Vector3(screenOffset.dx, screenOffset.dy, 0));
+    return Offset(transformed.x, transformed.y);
+  }
+
+  Offset _applyMatrix(Offset whiteboardOffset) {
+    final transformed = _transformationMatrix
+        .transform3(vm.Vector3(whiteboardOffset.dx, whiteboardOffset.dy, 0));
     return Offset(transformed.x, transformed.y);
   }
 
@@ -829,12 +1062,20 @@ class _MathNotesState extends State<MathNotes> {
   void _changeTool(ToolMode mode) {
     setState(() {
       _currentTool = mode;
+      if (mode != ToolMode.text) {
+        _selectedTextElement = null;
+        _showPenOptions = false;
+        _showColorOptions = false;
+      }
       if (mode == ToolMode.hand) {
         _showPenOptions = false;
         _showColorOptions = false;
       }
+      // Clear any text editing states
+      for (var element in _textElements) {
+        element.isEditing = false;
+      }
     });
-    _autoSave();
   }
 
   void _undo() {

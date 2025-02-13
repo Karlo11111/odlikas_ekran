@@ -57,7 +57,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                           children: [
                             const SizedBox(height: 20),
                             Text(
-                              "Matematicke biljeske",
+                              "Matematičke bilješke",
                               style: GoogleFonts.inter(
                                   fontSize: 36, fontWeight: FontWeight.w800),
                             ),
@@ -129,13 +129,13 @@ class _AddNewWhiteboardCard extends StatelessWidget {
 
   void _createNewWhiteboard(BuildContext context) async {
     final newWhiteboard = WhiteboardData(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: "Nova bilješka ${DateTime.now().day}.${DateTime.now().month}",
-      lastModified: DateTime.now(),
-      paths: [],
-      transformationMatrix: Matrix4.identity().storage.toList(),
-      currentScale: 1.0,
-    );
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: "Nova bilješka ${DateTime.now().day}.${DateTime.now().month}",
+        lastModified: DateTime.now(),
+        paths: [],
+        transformationMatrix: Matrix4.identity().storage.toList(),
+        currentScale: 1.0,
+        textElements: []);
 
     final box = Hive.box<WhiteboardData>('whiteboards');
     await box.add(newWhiteboard);
@@ -173,6 +173,7 @@ class _WhiteboardCard extends StatelessWidget {
           ],
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Container(
@@ -186,6 +187,8 @@ class _WhiteboardCard extends StatelessWidget {
                     ? Image.memory(
                         whiteboard.screenshot!,
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.error_outline),
                       )
                     : const Center(child: Text("No Preview")),
               ),
@@ -210,7 +213,7 @@ class _WhiteboardCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ))
+                )),
           ],
         ),
       ),
