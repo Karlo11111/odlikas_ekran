@@ -23,6 +23,7 @@ class HomePageViewModel extends ChangeNotifier {
   List<EvaluationElement>? get evaluationElements => _evaluationElements;
   String? get finalGrade => _finalGrade;
 
+  // metoda za dohvaćanje profila ucenika iz apija
   Future<void> fetchStudentProfile(String email, String password) async {
     _isLoading = true;
     notifyListeners();
@@ -31,14 +32,15 @@ class HomePageViewModel extends ChangeNotifier {
       final data = await _apiService.fetchStudentProfile(email, password);
       _studentProfile = data;
     } catch (e) {
-      // Handle error (e.g., show a snackbar or log the error)
-      print("Error fetching student profile: $e");
+      // ako je error, ispiši ga u konzolu
+      debugPrint("Error fetching student profile: $e");
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  // metoda za dohvaćanje ocjena iz apija
   Future<void> fetchGrades(String email, String password) async {
     _isLoading = true;
     notifyListeners();
@@ -54,6 +56,7 @@ class HomePageViewModel extends ChangeNotifier {
     }
   }
 
+  // metoda za dohvaćanje ocjena za određeni predmet iz apija
   Future<void> fetchSpecificSubjectGrades(
       String email, String password, String subjectId) async {
     _isLoading = true;
@@ -63,12 +66,12 @@ class HomePageViewModel extends ChangeNotifier {
       final data = await _apiService.fetchSpecificSubjectDetails(
           email, password, subjectId);
       _subjectGrades = data.monthlyGrades;
-      _evaluationElements = data.evaluationElements; // Set evaluation elements
-      _finalGrade = data.finalGrade; // Set final grade
+      _evaluationElements = data.evaluationElements;
+      _finalGrade = data.finalGrade;
     } catch (e) {
-      print("Error fetching specific subject grades: $e");
-      _subjectGrades = null; // Clear on error
-      _evaluationElements = null; // Clear on error
+      debugPrint("Error fetching specific subject grades: $e");
+      _subjectGrades = null;
+      _evaluationElements = null;
     } finally {
       _isLoading = false;
       notifyListeners();

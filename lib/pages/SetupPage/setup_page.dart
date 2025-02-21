@@ -21,31 +21,25 @@ class _SetupScreenState extends State<SetupScreen> {
     setState(() => _loading = true);
 
     try {
-      // Generate a new doc in "CreatedScreens"
+      // generiraj novi dokument u "CreatedScreens"
       final docRef =
           FirebaseFirestore.instance.collection('CreatedScreens').doc();
       final newId = docRef.id;
 
-      /* KADA SE BUDE RADILA ALPIKACIJA NA MOBU TREBA UPDATEAT OVAJ CONNECTED FIELD: await FirebaseFirestore.instance
-    .collection('CreatedScreens')
-    .doc(scannedScreenId)
-    .update({
-      'connected': true,
-    }); */
       await docRef.set({
         'screenId': newId,
         'createdAt': FieldValue.serverTimestamp(),
         'connected': false,
       });
 
-      // Mark setup as done locally
+      // označi da je setup gotov
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('setupDone', true);
 
-      //savve the screen id in prefs
+      // spremi screenId u SharedPreferences (lokalni storage)
       await prefs.setString('screenId', newId);
 
-      //setup detection
+      // spremi setup done u SharedPreferences
       await prefs.setBool('setupDone', true);
 
       if (!mounted) return;

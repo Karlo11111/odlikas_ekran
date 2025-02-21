@@ -40,18 +40,18 @@ class _GradesPageState extends State<GradesPage> {
         final fetchedPassword = doc.get('password') as String?;
 
         if (fetchedEmail != null && fetchedPassword != null) {
-          // Update local state
+          // updejtaj lokalni state
           setState(() {
             _email = fetchedEmail;
             _password = fetchedPassword;
           });
 
-          // Save to Hive for next time
+          // spremi u hive za drugi put
           final box = await Hive.openBox('user_credentials');
           await box.put('email', fetchedEmail);
           await box.put('password', fetchedPassword);
 
-          // Now fetch the grades
+          // sad fetchaj ocjene
           _fetchGradesFromViewModel(fetchedEmail, fetchedPassword);
         }
       }
@@ -67,15 +67,15 @@ class _GradesPageState extends State<GradesPage> {
   }
 
   Future<void> _initFromHive() async {
-    // 1) Open (or create) your Hive box
+    // 1) otvori ili kreiraj hive box
     final box = await Hive.openBox('user_credentials');
 
-    // 2) Attempt to read stored credentials
+    // 2) pokusaj dohvatiti email i password iz hive boxa
     final storedEmail = box.get('email') as String?;
     final storedPassword = box.get('password') as String?;
 
     if (storedEmail != null && storedPassword != null) {
-      // We have them locally, so set state and fetch the grades
+      // imamo ih lokalno, postavi ih u state
       setState(() {
         _email = storedEmail;
         _password = storedPassword;
@@ -83,9 +83,9 @@ class _GradesPageState extends State<GradesPage> {
 
       _fetchGradesFromViewModel(storedEmail, storedPassword);
     } else {
-      // No credentials in Hive, fall back to Firebase
+      // nemamo ih lokalno, probaj dohvatiti iz Firebasea
       debugPrint('No credentials found in Hive. Fetching from Firebase...');
-      await _fetchCredentialsAndGrades(); // the Firebase version
+      await _fetchCredentialsAndGrades();
     }
   }
 
@@ -126,7 +126,7 @@ class _GradesPageState extends State<GradesPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Back button
+                        // gumb za nazad
                         IconButton(
                           icon: const Icon(Icons.arrow_back),
                           iconSize: 50,

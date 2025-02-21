@@ -5,11 +5,13 @@ import 'package:odlikas_ekran/models/specific_subject.dart';
 import 'package:odlikas_ekran/models/student_profile.dart';
 import 'package:odlikas_ekran/models/tests.dart';
 
+// klasa koja sadrži metode za dohvaćanje podataka s ASP.NET API-ja
 class ApiService {
   final String baseUrl;
 
   ApiService(this.baseUrl);
 
+  // metoda za dohvaćanje osnovnih podataka o uceniku
   Future<StudentProfile> fetchStudentProfile(
       String email, String password) async {
     final url = Uri.parse('$baseUrl/api/Scraper/ScrapeStudentProfile');
@@ -27,6 +29,7 @@ class ApiService {
     }
   }
 
+  // metoda za dohvaćanje ocjena
   Future<Grades> fetchGrades(String email, String password) async {
     final url = Uri.parse('$baseUrl/api/Scraper/ScrapeSubjectsAndProfessors');
     final response = await http.post(
@@ -43,6 +46,7 @@ class ApiService {
     }
   }
 
+  // metoda za dohvaćanje ocjena za određeni predmet
   Future<List<MonthlyGrades>> fetchSpecificSubjectGrades(
       String email, String password, String subjectId) async {
     final url = Uri.parse(
@@ -63,6 +67,7 @@ class ApiService {
     }
   }
 
+  // metoda za dohvaćanje detalja o određenom predmetu
   Future<SubjectDetails> fetchSpecificSubjectDetails(
       String email, String password, String subjectId) async {
     final url = Uri.parse(
@@ -81,6 +86,7 @@ class ApiService {
     }
   }
 
+  // metoda za dohvaćanje detalja o testovima
   Future<Tests> fetchTestsDetails(String email, String password) async {
     final url = Uri.parse('$baseUrl/api/scraper/ScrapeTests');
     final response = await http.post(

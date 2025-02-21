@@ -1,3 +1,4 @@
+// klasa koja drzi model profila ucenika
 class StudentProfile {
   final String studentSchool;
   final String studentSchoolCity;

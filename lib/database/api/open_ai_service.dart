@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class OpenAiService {
+  // openai API ključ
   final String _apiKey = dotenv.get("OPENAI_API_KEY");
 
+  // metoda za rješavanje matematičkog izraza
   Future<List<Map<String, String>>?> solveMathExpression(
       String latexExpression) async {
     final uri = Uri.parse("https://api.openai.com/v1/chat/completions");
@@ -13,59 +16,94 @@ class OpenAiService {
       "Authorization": "Bearer $_apiKey",
     };
 
+    // prompt za rješavanje matematičkog izraza
     final messages = [
       {
         "role": "system",
         "content":
-            "Kao matematički asistent, generiraj KORAKS isključivo u JSON formatu:\n"
-                "{\"steps\": [{\"step\": \"opis\", \"result\": \"LaTeX\"}]}\n"
-                "Pravila:\n"
-                "1. Za JEDNOSTAVNE IZRAZE (bez varijabli):\n"
-                "   - Zadnji korak: samo konačni broj u obliku \\boxed{42}\n"
-                "   - Koraci: prikaži sve međukorake\n"
-                "2. Za SUSTAVE JEDNADŽBI:\n"
-                "   - Zadnji korak: prikaži obje varijable u formatu \\boxed{x=2}, \\boxed{y=1}\n"
-                "   - Koristi \\begin{cases} za sustave\n"
-                "   - Prikaži sve korake supstitucije\n"
-                "3. Za JEDNADŽBE S JEDNOM VARIJABLOM:\n"
-                "   - Zadnji korak: \\boxed{x=5}\n"
-                "4. Hrvatski jezik za sve opise\n"
-                "5. Nikada ne koristi \$ znakove\n"
-                "6. Izbjegavati tekst u result polju - samo matematički izrazi"
+            """Kao iscrpan matematički asistent, generiraj detaljne korake isključivo u JSON formatu:
+      {
+        "steps": [
+          {
+            "step": "Korak 1: Opis operacije na hrvatskom jeziku",
+            "result": "Matematički izraz u LaTeX-u bez okvira",
+            "explanation": "Detaljno objašnjenje matematičkog koncepta"
+      },
+        {...}
+      ],
+      "final_answer": "Konačno rješenje bez \\boxed{} formata"
+      }
+
+      Pravila:
+      1. Za SVAKI matematički postupak:
+         - Koristi tri polja: step, result, explanation
+         - Objasni SVAKU operaciju (npr. "Primjenjujemo distributivno svojstvo")
+         - Za jednadžbe: Objasni svaku algebarsku transformaciju
+         - Za sustave: Koristi metode supstitucije/eliminacije s detaljnim koracima
+      
+      2. Formatiranje:
+         - Nikada ne koristi \$ znakove
+         - Koristi hrvatske matematičke izraze (npr. "nepoznanica" umjesto "varijabla")
+         - LaTeX bez okvira u result polju
+         - Konačan odgovor u final_answer bez \\boxed
+      
+      3. Primjeri:
+         - Jednadžba: 
+           {
+             "step": "Oduzmimo 5 s obje strane za izolaciju x",
+             "result": "2x = 10",
+             "explanation": "Oduzimanje konstante s obje strane održava jednakost"
+           }
+         - Sustav:
+           {
+             "step": "Supstitucija y iz prve jednadžbe u drugu",
+             "result": "3x + 2(2x-1) = 8",
+             "explanation": "Zamjena izraza za y iz prve jednadžbe u drugu jednadžbu"
+           }
+
+      4. Objašnjenja:
+         - Navedi koristena matematička svojstva (npr. distributivno, asocijativno)
+         - Objasni logiku iza svake algebarske transformacije
+         - Za geometriju: Objasni teoreme i formule
+         - Za razlomke: Objasni postupke skraćivanja"""
       },
       {
         "role": "user",
-        "content": "Riješi: ${_preprocessLatex(latexExpression)}\n"
-            "Postupi ovako:\n"
-            "1. Analiziraj tip zadatka\n"
-            "2. Za obične izraze - prikaži sve međukorake ali zadnji korak samo konačni broj\n"
-            "3. Za jednadžbe s varijablama - prikaži sve varijable u konačnom rješenju\n"
-            "4. Koristi ispravan LaTeX bez grešaka"
+        "content":
+            """Riješi korak po korak: ${_preprocessLatex(latexExpression)}
+      - Zahtjevi:
+      1. Detaljna tekstualna objašnjenja za SVAKU operaciju
+      2. Prikaži SVE međukorake prije konačnog rješenja
+      3. Koristi ispravne matematičke termine na hrvatskom
+      4. Objasni geometrijski smisao gdje je primjenjivo
+      5. Za složene izraze koristi više manjih koraka"""
       }
     ];
 
+    // tijelo zahtjeva
     final body = {
-      "model": "gpt-4",
+      "model": "gpt-4-turbo",
       "messages": messages,
-      "max_tokens": 2000,
-      "temperature": 0.3,
+      "max_tokens": 3000,
+      "temperature": 0,
     };
 
     try {
+      // slanje zahtjeva
       final response =
           await http.post(uri, headers: headers, body: jsonEncode(body));
+      debugPrint(response.body);
       return _handleApiResponse(response);
     } catch (e) {
-      print('Request failed: $e');
+      debugPrint('Request failed: $e');
       return null;
     }
   }
 
+  // metoda za obradu odgovora API-ja
   List<Map<String, String>>? _handleApiResponse(http.Response response) {
-    print('API Response: ${response.body}');
-
     if (response.statusCode != 200) {
-      print('API Error: ${response.statusCode}');
+      debugPrint('API Error: ${response.statusCode}');
       return null;
     }
 
@@ -74,124 +112,83 @@ class OpenAiService {
       final content = data['choices'][0]['message']['content']?.trim() ?? '';
       return _parseContent(content);
     } catch (e) {
-      print('Response parsing error: $e');
+      debugPrint('Response parsing error: $e');
       return null;
     }
   }
 
+  // metoda za parsiranje sadržaja odgovora
   List<Map<String, String>>? _parseContent(String content) {
     try {
-      // Step 1: Extract clean JSON
-      final jsonString = _extractPureJson(content);
+      final jsonData =
+          jsonDecode(_sanitizeJson(content)) as Map<String, dynamic>;
+      final steps = jsonData['steps'] as List<dynamic>;
+      final finalAnswer = jsonData['final_answer'] as String?;
 
-      // Step 2: Fix encoding issues
-      final fixedEncoding = _cleanStepDescription(jsonString);
+      final processedSteps = _processSteps(steps);
 
-      // Step 3: Parse JSON
-      final jsonData = jsonDecode(fixedEncoding) as Map<String, dynamic>;
-
-      // Step 4: Validate and process steps
-      return _processSteps(jsonData['steps']);
-    } catch (e) {
-      print('Content processing failed: $e');
-      print(
-          'Problematic content: ${e is FormatException ? e.source : content}');
-      return null;
-    }
-  }
-
-  String _extractPureJson(String input) {
-    // Match the outermost JSON object including nested structures
-    final jsonPattern = RegExp(r'^\s*\{[\s\S]*\}\s*$');
-    if (jsonPattern.hasMatch(input)) return input;
-
-    // Extract first complete JSON object
-    final jsonStart = input.indexOf('{');
-    final jsonEnd = input.lastIndexOf('}');
-    if (jsonStart == -1 || jsonEnd == -1 || jsonEnd <= jsonStart) {
-      throw FormatException('No valid JSON found', input);
-    }
-
-    return input
-        .substring(jsonStart, jsonEnd + 1)
-        .replaceAll(RegExp(r'\\n'), '')
-        .replaceAll(RegExp(r'^[^{]*'), '')
-        .replaceAll(RegExp(r'[^}]*$'), '');
-  }
-
-  List<Map<String, String>>? _processSteps(dynamic steps) {
-    if (steps is! List) {
-      print('Invalid steps format - expected List');
-      return null;
-    }
-
-    return steps.map<Map<String, String>>((step) {
-      if (step is! Map<String, dynamic>) {
-        print('Invalid step format - skipping');
-        return {'step': 'Nevažeći korak', 'result': ''};
+      if (finalAnswer != null) {
+        processedSteps.add({
+          'step': 'Konačno rješenje',
+          'result': finalAnswer,
+          'explanation': 'Konačni rezultat zadatka'
+        });
       }
 
-      final description = _cleanStepDescription(step['step']?.toString() ?? '');
-      final result = _fixLatexFormatting(step['result']?.toString() ?? '');
+      return processedSteps;
+    } catch (e) {
+      debugPrint('Content processing failed: $e');
+      return null;
+    }
+  }
 
+  // metoda za sanitizaciju JSON-a
+  String _sanitizeJson(String input) {
+    return input
+        .replaceAll(RegExp(r'(?<!\\)\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})'), '')
+        .replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '')
+        .replaceAll(RegExp(r'\\n'), '');
+  }
+
+  // metoda za obradu koraka
+  List<Map<String, String>> _processSteps(List<dynamic> steps) {
+    return steps.map<Map<String, String>>((step) {
+      final stepData = step as Map<String, dynamic>;
       return {
-        'step': description,
-        'result': _validateLatex(result),
+        'step': _cleanText(stepData['step']?.toString() ?? ''),
+        'result': _formatLatex(stepData['result']?.toString() ?? ''),
+        'explanation': _cleanText(stepData['explanation']?.toString() ?? ''),
       };
     }).toList();
   }
 
-  String _validateLatex(String latex) {
-    // Handle system of equations final answer
-    if (latex.contains(r'\begin{cases}')) {
-      return latex
-          .replaceAll(RegExp(r'\\end{cases}'), r'\end{cases}')
-          .replaceAll(RegExp(r'\\\s*'), r' \\ ');
-    }
-
-    // Handle multiple variables in final answer
-    if (latex.contains(',')) {
-      return latex
-          .replaceAllMapped(RegExp(r'(\w+)\s*=\s*([\d.]+)'),
-              (m) => '\\boxed{${m[1]} = ${m[2]}}')
-          .replaceAll(',', ', ');
-    }
-
-    // Handle single-value results
-    if (!latex.contains('=') && !latex.contains(r'\boxed')) {
-      final value = latex.replaceAll(RegExp(r'[^\d.]'), '');
-      return '\\boxed{$value}';
-    }
-
-    return latex;
-  }
-
-  String _cleanStepDescription(String desc) {
-    return desc
+  // metoda za čišćenje teksta od nepoznatih utf-8 znakova
+  String _cleanText(String text) {
+    return text
+        .replaceAll(RegExp(r'\\[n"]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .replaceAll('Ä‡', 'č')
         .replaceAll('Å¡', 'š')
-        .replaceAll('Å¾', 'ž')
-        .replaceAll('–', '-')
-        .replaceAll('â€', '-')
-        .replaceAll('Ã¨', 'è')
-        .replaceAll('Ã©', 'é');
+        .replaceAll('Å¾', 'ž');
   }
 
-  String _fixLatexFormatting(String latex) {
+  // metoda za formatiranje LaTeX-a
+  String _formatLatex(String latex) {
     return latex
-        .replaceAll(r'\$', '')
+        .replaceAll(RegExp(r'\$(.*?)\$'), r'\1')
         .replaceAll('*', r'\times ')
+        .replaceAllMapped(RegExp(r'\\boxed{(.*?)}'), (m) => m.group(1)!)
         .replaceAllMapped(
-            RegExp(r'(\d)([a-zA-Z])'), (m) => '${m[1]} \\cdot ${m[2]}')
-        .replaceAll('=>', r'\Rightarrow');
+            RegExp(r'\\begin{cases}(.*?)\\end{cases}'),
+            (match) =>
+                '\\begin{cases}${match.group(1)!.replaceAll(' ', ' \\\\ ')}\end{cases}');
   }
 
+  // metoda za predobradu LaTeX-a
   String _preprocessLatex(String latex) {
     return latex
-        .replaceAll(RegExp(r'\\begin{array}{.*?}'), '')
-        .replaceAll(r'\end{array}', '')
-        .replaceAll('\\\\', '\n')
-        .replaceAll(RegExp(r'\\[()$]'), '')
+        .replaceAll(RegExp(r'\\[(){}]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }
 }

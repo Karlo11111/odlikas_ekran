@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive/hive.dart';
 import 'package:latext/latext.dart';
@@ -124,64 +125,112 @@ class _MathNotesState extends State<MathNotes> {
     _whiteboardsBox = Hive.box<WhiteboardData>('whiteboards');
     _whiteboardData = widget.whiteboardData!;
     _loadSavedState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(
+          const Duration(milliseconds: 100)); // Additional safety delay
+      if (mounted) {
+        await _autoSave(force: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _saveDebounce.cancel(); // Cancel pending debounced saves
+    _saveNow(); // Save immediately on exit
+    super.dispose();
   }
 
   void _loadSavedState() {
-    _paths =
-        _whiteboardData.paths.map((path) => DrawingPath.fromMap(path)).toList();
+    _paths = _whiteboardData.paths
+        .map((path) => DrawingPath.fromMap(_convertMap(path)))
+        .toList();
 
-    _transformationMatrix = Matrix4.fromList(
-      _whiteboardData.transformationMatrix,
-    );
-
+    _transformationMatrix =
+        Matrix4.fromList(_whiteboardData.transformationMatrix);
     _currentScale = _whiteboardData.currentScale;
 
     _textElements = _whiteboardData.textElements
-        .map((te) => TextElement.fromMap(te))
+        .map((te) => TextElement.fromMap(_convertMap(te)))
         .toList();
   }
 
-  Future<void> _autoSave() async {
-    _saveDebounce.run(() async {
-      try {
-        // 1) prvo sejvamo sve podatke o whiteboardu (matrice transformacije, putanje, boje, itd.)
-        final updatedData = _whiteboardData.copyWith(
-          paths: _paths.map((p) => p.toMap()).toList(),
-          transformationMatrix: _transformationMatrix.storage.toList(),
-          currentScale: _currentScale,
-          lastModified: DateTime.now(),
-          textElements: _textElements.map((te) => te.toMap()).toList(),
-        );
-
-        // 2) sada uzimamo screenshot whiteboarda i konvertujemo ga u Uint8List(za preview u galeriji)
-        final boundary = _whiteboardKey.currentContext?.findRenderObject()
-            as RenderRepaintBoundary?;
-        if (boundary != null) {
-          final uiImage = await boundary.toImage(pixelRatio: 0.3);
-          final byteData =
-              await uiImage.toByteData(format: ui.ImageByteFormat.png);
-          if (byteData != null) {
-            // convert u Uint8List
-            final pngBytes = byteData.buffer.asUint8List();
-
-            // 3)spremanje tih bytova u whiteboardData (tj hive box)
-            updatedData.screenshot = pngBytes;
-          }
+// Helper function for deep conversion
+  Map<String, dynamic> _convertMap(Map<dynamic, dynamic> originalMap) {
+    return Map<String, dynamic>.fromIterable(
+      originalMap.entries,
+      key: (entry) => entry.key.toString(),
+      value: (entry) {
+        if (entry.value is Map<dynamic, dynamic>) {
+          return _convertMap(entry.value);
+        } else if (entry.value is List) {
+          return _convertList(entry.value);
         }
+        return entry.value;
+      },
+    );
+  }
 
-        // 4) sejvanje u hive box sve skupa
-        final box = Hive.box<WhiteboardData>('whiteboards');
-        final index =
-            box.values.toList().indexWhere((wb) => wb.id == updatedData.id);
-        if (index != -1) {
-          box.putAt(index, updatedData);
-          _whiteboardData = updatedData;
-          debugPrint('Saved successfully to box, including screenshot');
-        }
-      } catch (e, stack) {
-        debugPrint('AutoSave error: $e\n$stack');
+  List<dynamic> _convertList(List<dynamic> originalList) {
+    return originalList.map((item) {
+      if (item is Map<dynamic, dynamic>) {
+        return _convertMap(item);
+      } else if (item is List) {
+        return _convertList(item);
       }
-    });
+      return item;
+    }).toList();
+  }
+
+  Future<void> _autoSave({bool force = false}) async {
+    if (force) {
+      await _saveNow(); // Save immediately without debounce
+    } else {
+      _saveDebounce.run(() => _saveNow());
+    }
+  }
+
+  Future<void> _saveNow() async {
+    try {
+      // Create a DEEP copy to preserve nested data relationships
+      final updatedData = WhiteboardData(
+        id: _whiteboardData.id,
+        name: _whiteboardData.name,
+        lastModified: DateTime.now(),
+        paths: List<Map<String, dynamic>>.from(_paths.map((p) => p.toMap())),
+        transformationMatrix: List<double>.from(_transformationMatrix.storage),
+        currentScale: _currentScale,
+        screenshot: _whiteboardData.screenshot, // Preserve existing
+        textElements: List<Map<String, dynamic>>.from(
+            _textElements.map((te) => te.toMap())),
+      );
+
+      // Capture new screenshot
+      if (_whiteboardKey.currentContext?.mounted == true) {
+        final boundary = _whiteboardKey.currentContext!.findRenderObject()
+            as RenderRepaintBoundary;
+
+        // Wait for stable frame
+        await SchedulerBinding.instance.endOfFrame;
+        if (boundary.debugNeedsPaint) {
+          await Future.delayed(const Duration(milliseconds: 16));
+        }
+
+        final uiImage = await boundary.toImage(pixelRatio: 2.5);
+        final byteData =
+            await uiImage.toByteData(format: ui.ImageByteFormat.png);
+        updatedData.screenshot = byteData?.buffer.asUint8List();
+      }
+
+      // Update Hive entry using original key
+      final box = Hive.box<WhiteboardData>('whiteboards');
+      await box.put(_whiteboardData.key, updatedData);
+
+      // Refresh local reference
+      _whiteboardData = box.get(_whiteboardData.key)!;
+    } catch (e, stack) {
+      debugPrint('Save error: $e\n$stack');
+    }
   }
 
   // ----------------------------------------------------------
@@ -669,6 +718,8 @@ class _MathNotesState extends State<MathNotes> {
             ),
           ),
 
+          if (_isSelectingArea) _buildSelectionOverlay(),
+
           // panel za prikazivanje latex rezultata (rezultata AI)
           if (_isOpenAiLoading)
             Positioned(
@@ -915,8 +966,6 @@ class _MathNotesState extends State<MathNotes> {
               ),
             );
           }),
-
-          if (_isSelectingArea) _buildSelectionOverlay(),
         ],
       ),
     );

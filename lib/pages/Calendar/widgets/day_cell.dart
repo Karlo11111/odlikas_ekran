@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// klasa koja drzi widget za prikaz dana u kalendaru
 class DayCell extends StatelessWidget {
   final DateTime date;
   final bool isWithinCurrentMonth;

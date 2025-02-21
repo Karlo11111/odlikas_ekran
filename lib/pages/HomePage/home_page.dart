@@ -29,26 +29,26 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadCredentialsFromHive() async {
-    // open  Hive box
+    // 1) otvori ili kreiraj hive box
     final box = await Hive.openBox('user_credentials');
 
-    // attempt to read stored credentials
+    // 2) pokusaj dohvatiti email i password iz hive boxa
     final storedEmail = box.get('email') as String?;
     final storedPassword = box.get('password') as String?;
 
     if (storedEmail != null && storedPassword != null) {
-      // if we already have locally saved credentials:
+      // imamo ih lokalno, postavi ih u state
       setState(() {
         _email = storedEmail;
         _password = storedPassword;
       });
 
-      // fetch grades and do other actions:
+      // fetchaj ocjene iz API-a
       if (mounted) {
         context.read<HomePageViewModel>().fetchGrades(_email!, _password!);
       }
     } else {
-      // No credentials in Hive, call Firebase
+      // nemamo ih lokalno, probaj dohvatiti iz Firebasea
       _fetchCredentialsFromFirebase();
     }
   }
@@ -73,19 +73,19 @@ class _HomePageState extends State<HomePage> {
         final fetchedEmail = doc.get('linkedUser') as String?;
         final fetchedPassword = doc.get('password') as String?;
 
-        // If valid, store them in Hive
+        // ako postoje, updejtaj lokalni state
         if (fetchedEmail != null && fetchedPassword != null) {
           setState(() {
             _email = fetchedEmail;
             _password = fetchedPassword;
           });
 
-          // Save to Hive
+          // spremi u hive za drugi put
           final box = await Hive.openBox('user_credentials');
           await box.put('email', fetchedEmail);
           await box.put('password', fetchedPassword);
 
-          // Now fetch grades
+          // sad fetchaj ocjene
           viewModel.fetchGrades(fetchedEmail, fetchedPassword);
         }
       }
@@ -119,7 +119,7 @@ class _HomePageState extends State<HomePage> {
                   child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Top-left container
+                    // gornji lijevi container
                     Positioned(
                       left: MediaQuery.of(context).size.width * 0.02,
                       top: MediaQuery.of(context).size.height * 0.02,
@@ -130,7 +130,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // Bottom-left container
+                    // donji lijevi container
                     Positioned(
                       left: MediaQuery.of(context).size.width * 0.02,
                       bottom: MediaQuery.of(context).size.height * 0.02,
@@ -144,7 +144,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // Top-right container
+                    // gornji desni container
                     Positioned(
                       right: MediaQuery.of(context).size.width * 0.02,
                       top: MediaQuery.of(context).size.height * 0.02,
@@ -158,7 +158,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // Bottom-right container
+                    // donji desni container
                     Positioned(
                       right: MediaQuery.of(context).size.width * 0.02,
                       bottom: MediaQuery.of(context).size.height * 0.02,

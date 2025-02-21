@@ -72,15 +72,15 @@ class _SubjectDetailsPageState extends State<SubjectDetailsPage> {
   }
 
   Future<void> _initFromHive() async {
-    // 1) Open (or create) your Hive box
+    // 1) otvori ili kreiraj hive box
     final box = await Hive.openBox('user_credentials');
 
-    // 2) Attempt to read stored credentials
+    // 2) pokusaj dohvatiti email i password iz hive boxa
     final storedEmail = box.get('email') as String?;
     final storedPassword = box.get('password') as String?;
 
     if (storedEmail != null && storedPassword != null) {
-      // We have them locally, so set state and fetch the grades
+      // imamo ih lokalno, postavi ih u state
       setState(() {
         _email = storedEmail;
         _password = storedPassword;
@@ -88,7 +88,7 @@ class _SubjectDetailsPageState extends State<SubjectDetailsPage> {
 
       _fetchGradesFromViewModel(storedEmail, storedPassword);
     } else {
-      // No credentials in Hive, fall back to Firebase
+      // nemamo ih lokalno, probaj dohvatiti iz Firebasea
       debugPrint('No credentials found in Hive. Fetching from Firebase...');
       await _fetchCredentialsAndGrades();
     }

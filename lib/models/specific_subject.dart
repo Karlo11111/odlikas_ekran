@@ -1,3 +1,4 @@
+// metoda za objekt ocjena po mjesecima
 class MonthlyGrades {
   final String month;
   final List<SpecificSubject> grades;
@@ -14,6 +15,7 @@ class MonthlyGrades {
   }
 }
 
+// metoda za objekt detalja predmeta
 class SubjectDetails {
   final List<EvaluationElement> evaluationElements;
   final List<MonthlyGrades> monthlyGrades;
@@ -25,6 +27,7 @@ class SubjectDetails {
     required this.finalGrade,
   });
 
+  // metoda za pretvaranje JSON objekta u SubjectDetails objekt
   factory SubjectDetails.fromJson(Map<String, dynamic> json) {
     return SubjectDetails(
       finalGrade: json['finalGrade'],
@@ -38,6 +41,7 @@ class SubjectDetails {
   }
 }
 
+// metoda za objekt elementa evaluacije
 class EvaluationElement {
   final String name;
   final List<String> gradesByMonth;
@@ -47,6 +51,7 @@ class EvaluationElement {
     required this.gradesByMonth,
   });
 
+  // metoda za pretvaranje JSON objekta u EvaluationElement objekt
   factory EvaluationElement.fromJson(Map<String, dynamic> json) {
     return EvaluationElement(
       name: json['name'],
@@ -55,6 +60,7 @@ class EvaluationElement {
   }
 }
 
+// metoda za objekt specificnog predmeta
 class SpecificSubject {
   final String gradeDate;
   final String gradeNote;
@@ -66,6 +72,7 @@ class SpecificSubject {
     required this.grade,
   });
 
+  // metoda za pretvaranje JSON objekta u SpecificSubject objekt
   factory SpecificSubject.fromJson(Map<String, dynamic> json) {
     return SpecificSubject(
       gradeDate: json['gradeDate'],

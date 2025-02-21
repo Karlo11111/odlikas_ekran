@@ -1,3 +1,4 @@
+// klasa za model ocjena
 class Grades {
   final List<Subject> subjects;
 
@@ -5,6 +6,7 @@ class Grades {
     required this.subjects,
   });
 
+  // metoda za pretvorbu JSON objekta u Grades objekt
   factory Grades.fromJson(Map<String, dynamic> json) {
     return Grades(
       subjects: (json['subjects'] as List<dynamic>)
@@ -14,6 +16,7 @@ class Grades {
   }
 }
 
+// klasa za model specificnog predmeta
 class Subject {
   final String grade, subjectId, professor, subjectName;
 
@@ -24,6 +27,7 @@ class Subject {
     required this.subjectId,
   });
 
+  // metoda za pretvorbu JSON objekta u Subject objekt
   factory Subject.fromJson(Map<String, dynamic> json) {
     return Subject(
       subjectName: json['subjectName'] ?? '',

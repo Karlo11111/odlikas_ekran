@@ -34,7 +34,7 @@ class EvaluationTable extends StatelessWidget {
         10: FlexColumnWidth(1),
       },
       children: [
-        // Table Header
+        // zaglavlje tablice
         TableRow(
           decoration: const BoxDecoration(
             color: Colors.blue,

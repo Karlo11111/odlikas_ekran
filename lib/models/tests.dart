@@ -1,8 +1,10 @@
+// klasa za model testova
 class Tests {
   final Map<String, List<TestDetail>> testsByMonth;
 
   Tests({required this.testsByMonth});
 
+  // metoda za pretvorbu JSON objekta u Tests objekt
   factory Tests.fromJson(Map<String, dynamic> json) {
     final Map<String, List<TestDetail>> parsedTestsByMonth = {};
 
@@ -16,6 +18,7 @@ class Tests {
   }
 }
 
+// klasa za model detaljnijeg objekta testa
 class TestDetail {
   final String testName;
   final String testDate;
@@ -27,6 +30,7 @@ class TestDetail {
     required this.testDescription,
   });
 
+  // metoda za pretvorbu JSON objekta u TestDetail objekt
   factory TestDetail.fromJson(Map<String, dynamic> json) {
     return TestDetail(
       testName: json['testName'],

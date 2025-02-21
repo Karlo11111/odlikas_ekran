@@ -26,6 +26,12 @@ void main() async {
   Hive.registerAdapter(WhiteboardDataAdapter());
   await Hive.openBox<WhiteboardData>('whiteboards');
 
+  // Add this to refresh all objects on startup
+  final whiteboardsBox = Hive.box<WhiteboardData>('whiteboards');
+  whiteboardsBox.values.forEach((wb) {
+    whiteboardsBox.get(wb.key);
+  });
+
   // Lock orientation to landscape mode
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,

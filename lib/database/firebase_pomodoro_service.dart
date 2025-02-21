@@ -1,13 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// klasa za interakciju sa Firestore bazom podataka za Pomodoro timer
 class FirestorePomodoroService {
   final String timerId;
 
   FirestorePomodoroService(this.timerId);
 
+  // referenca na dokument u Firestore bazi podataka
   DocumentReference get timerDoc =>
       FirebaseFirestore.instance.collection('pomodoroTimers').doc(timerId);
 
+  // metoda za inicijalizaciju timera
   Future<void> initializeTimer() async {
     final docSnapshot = await timerDoc.get();
     if (!docSnapshot.exists) {
@@ -21,6 +24,7 @@ class FirestorePomodoroService {
     }
   }
 
+  // metoda za pokretanje timera
   Future<void> startTimer(
       String currentPhase, int duration, int cycleCount) async {
     await timerDoc.set({
@@ -28,12 +32,12 @@ class FirestorePomodoroService {
       'currentDuration': duration,
       'isRunning': true,
       'cycleCount': cycleCount,
-      'startTimestamp': FieldValue.serverTimestamp(), // server timestamp
+      'startTimestamp': FieldValue.serverTimestamp(), // vrijeme servera
     }, SetOptions(merge: true));
   }
 
+  // metoda za zaustavljanje timera s lokalnim preostalim vremenom
   Future<void> stopTimerWithLocalLeftover(int localLeftover) async {
-    // localLeftover is your local _secondsNotifier.value
     final docSnapshot = await timerDoc.get();
     if (docSnapshot.exists) {
       await timerDoc.update({
@@ -44,6 +48,7 @@ class FirestorePomodoroService {
     }
   }
 
+  // metoda za prelazak u sljedeću fazu
   Future<void> forwardPhase(
       String newPhase, int newDuration, int cycleCount) async {
     await timerDoc.set({
@@ -55,7 +60,7 @@ class FirestorePomodoroService {
     }, SetOptions(merge: true));
   }
 
-  // slusaj promene na timeru
+  // slusaj promjene na timeru
   Stream<DocumentSnapshot> listenToTimer() {
     return timerDoc.snapshots();
   }

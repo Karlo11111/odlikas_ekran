@@ -25,8 +25,12 @@ class SolutionStepsPage extends StatelessWidget {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             title: Math.tex(
-              step['result'] ?? '',
+              _fixMultiplicationSymbols(step['result'] ?? ''),
               textStyle: GoogleFonts.inter(fontSize: 30),
+              onErrorFallback: (err) => Text(
+                _cleanRawLatex(step['result'] ?? ''),
+                style: GoogleFonts.inter(fontSize: 30),
+              ),
             ),
             trailing: Icon(
               Icons.keyboard_arrow_down,
@@ -38,7 +42,7 @@ class SolutionStepsPage extends StatelessWidget {
                 color: Colors.white,
                 width: double.infinity,
                 child: Text(
-                  step['step'] ?? 'Nema dostupnog objašnjenja',
+                  _fixDiacritics(step['step'] ?? 'Nema dostupnog objašnjenja'),
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     color: Colors.grey[800],
@@ -52,103 +56,85 @@ class SolutionStepsPage extends StatelessWidget {
       );
     }
 
-    // ako je null zadnje rijesenje
     final lastResult = steps.isNotEmpty ? steps.last['result'] ?? '' : '';
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: CustomScrollView(
-        slivers: [
-          // Header with Back Button
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 25),
-              child: Row(
-                children: [
-                  // RETURN BUTTON
-                  SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.035,
+      body: Column(
+        children: [
+          // Header Section
+          Padding(
+            padding: const EdgeInsets.only(top: 25, left: 16, right: 16),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  iconSize: 50,
+                  color: const Color.fromRGBO(236, 145, 32, 1),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      "Koraci rješenja",
+                      style: GoogleFonts.inter(
+                          fontSize: 36, fontWeight: FontWeight.w800),
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    iconSize: 50,
-                    color: const Color.fromRGBO(236, 145, 32, 1),
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Navigate back
-                    },
-                  ),
-                  SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.32,
-                  ),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 20),
-                      Text(
-                        "Koraci rješenja",
-                        style: GoogleFonts.inter(
-                            fontSize: 36, fontWeight: FontWeight.w800),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-
           // Main Content
-          SliverToBoxAdapter(
+          Expanded(
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left Column - Steps
+                // Scrollable Steps List
                 Expanded(
                   flex: 4,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: ListView.builder(
-                      scrollDirection: Axis.vertical,
-                      shrinkWrap: true,
                       itemCount: steps.length,
                       itemBuilder: (context, index) =>
                           _buildStepCard(steps[index], index),
                     ),
                   ),
                 ),
-
+                // Orange Line
                 Container(
                   width: 15,
                   decoration: BoxDecoration(
                     color: const Color(0xFFEC9120),
                     borderRadius: BorderRadius.circular(5),
                   ),
-                  height: MediaQuery.of(context).size.height * 0.85,
+                  height: double.infinity,
                 ),
-
-                // Right Column - Final Solution
+                // Solution Panel
                 Expanded(
                   flex: 4,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Align(
-                            alignment: Alignment.topLeft,
-                            child: Text(
-                              'Rješenje',
-                              style: GoogleFonts.inter(
-                                fontSize: 44,
-                                fontWeight: FontWeight.bold,
-                                color: const Color.fromRGBO(236, 145, 32, 1),
-                              ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Rješenje',
+                            style: GoogleFonts.inter(
+                              fontSize: 44,
+                              fontWeight: FontWeight.bold,
+                              color: const Color.fromRGBO(236, 145, 32, 1),
                             ),
                           ),
-                          const SizedBox(height: 230),
-                          Container(
+                        ),
+                        const Spacer(),
+                        const Spacer(),
+                        Center(
+                          child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -160,39 +146,42 @@ class SolutionStepsPage extends StatelessWidget {
                                 fontSize: 58,
                                 color: Colors.black,
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 130),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color.fromRGBO(236, 145, 32, 1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            width: double.infinity,
-                            child: TextButton(
-                              onPressed: () {},
-                              child: Text(
-                                "Prikaži korake",
-                                style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 30,
-                                  color: Colors.white,
-                                ),
+                              onErrorFallback: (err) => Text(
+                                _cleanRawLatex(lastResult),
+                                style: GoogleFonts.inter(fontSize: 58),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 5),
-                          TextButton(
+                        ),
+                        const Spacer(flex: 2),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color.fromRGBO(236, 145, 32, 1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          width: double.infinity,
+                          child: TextButton(
                             onPressed: () {},
                             child: Text(
-                              "Zadatci slični ovome",
+                              "Prikaži korake",
                               style: GoogleFonts.inter(
-                                  fontSize: 20, color: Colors.black),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 30,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        TextButton(
+                          onPressed: () {},
+                          child: Text(
+                            "Zadatci slični ovome",
+                            style: GoogleFonts.inter(
+                                fontSize: 20, color: Colors.black),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -202,5 +191,27 @@ class SolutionStepsPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Keep the helper methods the same
+  String _fixMultiplicationSymbols(String latex) {
+    return latex.replaceAllMapped(
+        RegExp(r'(cdot|times)'), (match) => r'\times');
+  }
+
+  String _cleanRawLatex(String latex) {
+    return latex
+        .replaceAll(r'\', '')
+        .replaceAll('{', '')
+        .replaceAll('}', '')
+        .replaceAll("boxed", "");
+  }
+
+  String _fixDiacritics(String text) {
+    return text
+        .replaceAll('Å¡', 'š')
+        .replaceAll('Å¾', 'ž')
+        .replaceAll('Ä‡', 'č')
+        .replaceAll('Å¡', 'š');
   }
 }

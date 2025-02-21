@@ -129,21 +129,24 @@ class _AddNewWhiteboardCard extends StatelessWidget {
 
   void _createNewWhiteboard(BuildContext context) async {
     final newWhiteboard = WhiteboardData(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: "Nova bilješka ${DateTime.now().day}.${DateTime.now().month}",
-        lastModified: DateTime.now(),
-        paths: [],
-        transformationMatrix: Matrix4.identity().storage.toList(),
-        currentScale: 1.0,
-        textElements: []);
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: "Nova bilješka ${DateTime.now().day}.${DateTime.now().month}",
+      lastModified: DateTime.now(),
+      paths: [],
+      transformationMatrix: Matrix4.identity().storage.toList(),
+      currentScale: 1.0,
+      textElements: [],
+    );
 
     final box = Hive.box<WhiteboardData>('whiteboards');
-    await box.add(newWhiteboard);
+    final key = await box.add(newWhiteboard); // Add to Hive to assign a key
+    final savedWhiteboard =
+        box.get(key); // Retrieve the version with a Hive key
 
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MathNotes(whiteboardData: newWhiteboard),
+        builder: (context) => MathNotes(whiteboardData: savedWhiteboard!),
       ),
     );
   }
