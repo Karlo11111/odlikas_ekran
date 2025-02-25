@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: use_build_context_synchronously, unused_field
 
 import 'dart:async';
 
@@ -6,8 +6,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
+import 'package:lottie/lottie.dart';
 import 'package:odlikas_ekran/database/firebase_pomodoro_service.dart';
+import 'package:odlikas_ekran/pages/PomodoroTimer/streaks/vertical_streak_progress.dart';
 import 'package:odlikas_ekran/pages/PomodoroTimer/widgets/pomodoro_container.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PomodoroTimerPage extends StatefulWidget {
   const PomodoroTimerPage({super.key});
@@ -19,34 +22,65 @@ class PomodoroTimerPage extends StatefulWidget {
 class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
   late FirestorePomodoroService pomodoroService;
 
+  bool _isInitialized = false;
+  bool _isLoading = true;
+
+  int _daysLearning = 0;
+  int _hoursLearning = 0;
+  int _streakCount = 0;
+
+  int _weeklySessions = 0;
+  int _weeklyStreak = 0;
+
   // trebamo samo email jer ne fetchamo nikakve podatke s ednebvnik api - samo trebamo email uvatiti iz fierbasea jer se tako zove doc u firebaseu
   String? _email;
 
   Future<void> _initFromHive() async {
-    // otvori Hive box
-    final box = await Hive.openBox('user_credentials');
+    try {
+      final box = await Hive.openBox('user_credentials');
+      final storedEmail = box.get('email') as String?;
 
-    // loadaj email
-    final storedEmail = box.get('email') as String?;
+      if (storedEmail == null) {
+        Navigator.of(context).pop();
+        return;
+      }
 
-    if (storedEmail == null) {
-      // ako nema nista u hive-u, vrati na homepage
-      debugPrint('No credentials found in Hive.');
-      Navigator.of(context).pop();
-      return;
+      final prefs = await SharedPreferences.getInstance();
+      final screenId = prefs.getString('screenId');
+
+      if (screenId != null) {
+        final prefsDoc = await FirebaseFirestore.instance
+            .collection('CreatedScreens')
+            .doc(screenId)
+            .get();
+
+        if (prefsDoc.exists) {
+          final data = prefsDoc.data()!;
+          final preferences = data['preferences'] as Map<String, dynamic>;
+          setState(() {
+            _daysLearning = (preferences['daysLearning'] as int?) ?? 0;
+            _hoursLearning = (preferences['hoursLearning'] as int?) ?? 0;
+            _email = storedEmail;
+          });
+        }
+      }
+
+      // Initialize service AFTER getting preferences
+      setState(() {
+        pomodoroService = FirestorePomodoroService(
+          _email!,
+          _daysLearning,
+          _hoursLearning,
+        );
+        _isInitialized = true;
+      });
+
+      pomodoroService.initializeTimer();
+      _listenToPomodoroChanges();
+      _isLoading = false;
+    } catch (e) {
+      debugPrint('Initialization error: $e');
     }
-
-    // updejtat state s emailom
-    setState(() {
-      _email = storedEmail;
-    });
-
-    // sad kad imamo email zovi firestore pomdooro service
-    pomodoroService = FirestorePomodoroService(_email!);
-
-    // inicializiraj timer i slusaj promjene
-    pomodoroService.initializeTimer();
-    _listenToPomodoroChanges();
   }
 
   void _listenToPomodoroChanges() {
@@ -61,6 +95,9 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
           _isRunning = mapData['isRunning'] ?? false;
           _initialDuration = mapData['currentDuration'] ?? 25 * 60;
           _startTimestamp = mapData['startTimestamp'] as Timestamp?;
+          _streakCount = mapData['streakCount'] ?? 0;
+          _weeklySessions = data['weeklySessions'] ?? 0;
+          _weeklyStreak = data['weeklyStreak'] ?? 0;
         });
 
         if (_isRunning && _startTimestamp != null) {
@@ -186,111 +223,263 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          // return botun i naslov
-          Padding(
-            padding: const EdgeInsets.only(top: 25),
-            child: Row(
+      body: _isLoading
+          ? Center(
+              child: Lottie.asset(
+                'assets/animations/bird_animation.json',
+                width: 150,
+                height: 150,
+                fit: BoxFit.contain,
+              ),
+            )
+          : Column(
               children: [
-                SizedBox(width: MediaQuery.of(context).size.width * 0.035),
-                IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  iconSize: 50,
-                  color: const Color.fromRGBO(236, 145, 32, 1),
-                  onPressed: () => Navigator.of(context).pop(),
+                // return botun i naslov
+                Padding(
+                  padding: const EdgeInsets.only(top: 25),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                          width: MediaQuery.of(context).size.width * 0.032),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        iconSize: 50,
+                        color: const Color.fromRGBO(236, 145, 32, 1),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      SizedBox(width: MediaQuery.of(context).size.width * 0.23),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 20),
+                          Text(
+                            "Pomodoro mjerač vremena",
+                            style: GoogleFonts.inter(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(width: MediaQuery.of(context).size.width * 0.236),
+
+                SizedBox(height: MediaQuery.of(context).size.height * 0.05),
+
+                // --- POMODORO CONTAINER ---
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const SizedBox(height: 20),
-                    Text(
-                      "Pomodoro mjerač vremena",
-                      style: GoogleFonts.inter(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w800,
+                    Container(), // gurne sve desno
+                    Padding(
+                      padding: const EdgeInsets.only(left: 80),
+                      child: PomodoroContainer(
+                        currentPhase: _currentPhase,
+                        currentDuration:
+                            Duration(seconds: _displayedSecondsLeft),
+                        isRunning: _isRunning,
+                        secondsNotifier: _secondsNotifier,
+                        startTimer: () {
+                          final leftover = _secondsNotifier.value;
+                          pomodoroService.startTimer(
+                              _currentPhase, leftover, _cycleCount);
+                          setState(() {
+                            _isRunning = true;
+                            _startTimestamp = Timestamp.now();
+                            _initialDuration = leftover;
+                          });
+                          _startLocalTicker();
+                        },
+                        stopTimer: () {
+                          final now = DateTime.now();
+                          final elapsed = _startTimestamp != null
+                              ? now
+                                  .difference(_startTimestamp!.toDate())
+                                  .inSeconds
+                              : 0;
+                          final leftover = (_initialDuration - elapsed)
+                              .clamp(0, _initialDuration);
+
+                          pomodoroService.stopTimerWithLocalLeftover(leftover);
+                          _stopLocalTicker();
+                        },
+                        forwardTimer: _forwardTimer,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 20),
+                      child: VerticalProgressCircles(
+                        daysLearning: _daysLearning,
+                        hoursLearning: _hoursLearning,
+                        streakCount: _weeklySessions,
+                        onTap: _showStreakDetails,
+                        color: _currentPhase == "Pomodoro"
+                            ? const Color.fromRGBO(236, 146, 31, 1)
+                            : _currentPhase == "Kratka pauza"
+                                ? const Color.fromRGBO(23, 148, 210, 1)
+                                : const Color.fromRGBO(20, 133, 186, 1),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
 
-          SizedBox(height: MediaQuery.of(context).size.height * 0.05),
+                const SizedBox(height: 10),
 
-          // --- POMODORO CONTAINER ---
-          PomodoroContainer(
-            currentPhase: _currentPhase,
-            currentDuration: Duration(seconds: _displayedSecondsLeft),
-            isRunning: _isRunning,
-            secondsNotifier: _secondsNotifier,
-            startTimer: () {
-              // vas lokalni ostatak vremena
-              final leftover = _secondsNotifier.value;
-
-              // kreni u firestoru
-              pomodoroService.startTimer(_currentPhase, leftover, _cycleCount);
-
-              // updejtaj lokalni state
-              setState(() {
-                _isRunning = true;
-                _startTimestamp = Timestamp.now();
-                _initialDuration = leftover;
-              });
-
-              // pokreni lokalni timer
-              _startLocalTicker();
-            },
-            stopTimer: () {
-              final now = DateTime.now();
-              final elapsed = _startTimestamp != null
-                  ? now.difference(_startTimestamp!.toDate()).inSeconds
-                  : 0;
-              final leftover =
-                  (_initialDuration - elapsed).clamp(0, _initialDuration);
-
-              pomodoroService.stopTimerWithLocalLeftover(leftover);
-              _stopLocalTicker();
-            },
-            forwardTimer: _forwardTimer,
-          ),
-
-          const SizedBox(height: 10),
-
-          // --- CYCLE COUNT ---
-          Text(
-            "#${1 + _cycleCount}",
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.w800,
-              fontSize: 35,
-              color: _currentPhase == "Pomodoro"
-                  ? const Color.fromRGBO(236, 146, 31, 1)
-                  : _currentPhase == "Kratka pauza"
-                      ? const Color.fromRGBO(23, 148, 210, 1)
-                      : const Color.fromRGBO(20, 133, 186, 1),
-            ),
-          ),
-
-          // --- PHASE HINT TEXT ---
-          _currentPhase == "Pomodoro"
-              ? Text(
-                  "Vrijeme je za učiti!",
+                // --- CYCLE COUNT ---
+                Text(
+                  "#${1 + _cycleCount}",
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w800,
-                    fontSize: 24,
-                    color: Colors.black,
-                  ),
-                )
-              : Text(
-                  "Vrijeme je za pauzu!",
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 24,
-                    color: Colors.black,
+                    fontSize: 35,
+                    color: _currentPhase == "Pomodoro"
+                        ? const Color.fromRGBO(236, 146, 31, 1)
+                        : _currentPhase == "Kratka pauza"
+                            ? const Color.fromRGBO(23, 148, 210, 1)
+                            : const Color.fromRGBO(20, 133, 186, 1),
                   ),
                 ),
+
+                // --- PHASE HINT TEXT ---
+                _currentPhase == "Pomodoro"
+                    ? Text(
+                        "Vrijeme je za učiti!",
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 24,
+                          color: Colors.black,
+                        ),
+                      )
+                    : Text(
+                        "Vrijeme je za pauzu!",
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 24,
+                          color: Colors.black,
+                        ),
+                      ),
+              ],
+            ),
+    );
+  }
+
+  void _showStreakDetails() {
+    final targetSessions = _daysLearning * (_hoursLearning * 60 ~/ 25);
+    final progress =
+        targetSessions > 0 ? (_streakCount / targetSessions).clamp(0, 1) : 0;
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          width: MediaQuery.of(context).size.width * 0.5,
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Statistika Učenja',
+                  style: GoogleFonts.inter(
+                      color: Colors.black,
+                      fontSize: 40,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              _buildStatItem('🔥 Trenutni Niz', '$_weeklyStreak tjedana'),
+              const SizedBox(height: 15),
+              _buildStatItem('📅 Cilj tjedno', '$_daysLearning dana/tjedno'),
+              const SizedBox(height: 15),
+              _buildStatItem('⏳ Dnevni cilj', '$_hoursLearning sati/dan'),
+              const SizedBox(height: 15),
+              _buildStatItem(
+                  '✅ Održane sesije', '$_streakCount sesija ovaj tjedan'),
+              const Spacer(),
+              LinearProgressIndicator(
+                value: progress.toDouble(),
+                backgroundColor: Colors.black.withOpacity(0.3),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  _currentPhase == "Pomodoro"
+                      ? const Color.fromRGBO(236, 146, 31, 1)
+                      : _currentPhase == "Kratka pauza"
+                          ? const Color.fromRGBO(23, 148, 210, 1)
+                          : const Color.fromRGBO(20, 133, 186, 1),
+                ),
+                minHeight: 20,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Napredak:',
+                      style: GoogleFonts.inter(
+                          color: _currentPhase == "Pomodoro"
+                              ? const Color.fromRGBO(236, 146, 31, 1)
+                              : _currentPhase == "Kratka pauza"
+                                  ? const Color.fromRGBO(23, 148, 210, 1)
+                                  : const Color.fromRGBO(20, 133, 186, 1),
+                          fontSize: 16)),
+                  Text('${(progress * 100).toStringAsFixed(1)}%',
+                      style: GoogleFonts.inter(
+                          color: _currentPhase == "Pomodoro"
+                              ? const Color.fromRGBO(236, 146, 31, 1)
+                              : _currentPhase == "Kratka pauza"
+                                  ? const Color.fromRGBO(23, 148, 210, 1)
+                                  : const Color.fromRGBO(20, 133, 186, 1),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    backgroundColor: _currentPhase == "Pomodoro"
+                        ? const Color.fromRGBO(236, 146, 31, 1)
+                        : _currentPhase == "Kratka pauza"
+                            ? const Color.fromRGBO(23, 148, 210, 1)
+                            : const Color.fromRGBO(20, 133, 186, 1),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text('UREDU',
+                      style: GoogleFonts.inter(
+                          fontSize: 24,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold)),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Text(label,
+              style: GoogleFonts.inter(
+                  color: Colors.black,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500)),
+          const Spacer(),
+          Text(value,
+              style: GoogleFonts.inter(
+                  color: Colors.black,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold)),
         ],
       ),
     );

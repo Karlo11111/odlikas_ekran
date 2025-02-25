@@ -159,28 +159,39 @@ class _PomodoroContainerState extends State<PomodoroContainer> {
                   const SizedBox(width: 150),
 
                   // "Započni" or "Zaustavi" botui
-                  ElevatedButton(
-                    onPressed:
-                        widget.isRunning ? widget.stopTimer : widget.startTimer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: widget.currentPhase == "Pomodoro"
-                          ? const Color.fromRGBO(236, 146, 31, 1)
-                          : widget.currentPhase == "Kratka pauza"
-                              ? const Color.fromRGBO(23, 148, 210, 1)
-                              : const Color.fromRGBO(20, 133, 186, 1),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 70,
-                        vertical: 20,
+                  SizedBox(
+                    width: 300, // Fixed width
+                    child: Transform.translate(
+                      offset: Offset(
+                          0,
+                          widget.isRunning
+                              ? 5
+                              : 0), // 5 pixels down when active
+                      child: ElevatedButton(
+                        onPressed: widget.isRunning
+                            ? widget.stopTimer
+                            : widget.startTimer,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: widget.currentPhase == "Pomodoro"
+                              ? const Color.fromRGBO(236, 146, 31, 1)
+                              : widget.currentPhase == "Kratka pauza"
+                                  ? const Color.fromRGBO(23, 148, 210, 1)
+                                  : const Color.fromRGBO(20, 133, 186, 1),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 70,
+                            vertical: 20,
+                          ),
+                          textStyle: const TextStyle(
+                              fontSize: 30, fontWeight: FontWeight.bold),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          elevation: widget.isRunning ? 0 : 5,
+                        ),
+                        child: Text(widget.isRunning ? "ZAUSTAVI" : "ZAPOČNI"),
                       ),
-                      textStyle: const TextStyle(
-                          fontSize: 30, fontWeight: FontWeight.bold),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      elevation: widget.isRunning ? 0 : 5,
                     ),
-                    child: Text(widget.isRunning ? "ZAUSTAVI" : "ZAPOČNI"),
                   ),
 
                   const SizedBox(width: 50),
@@ -193,11 +204,17 @@ class _PomodoroContainerState extends State<PomodoroContainer> {
                           iconSize: 100,
                           color: Colors.white,
                         )
-                      : IconButton(
-                          onPressed: widget.forwardTimer,
-                          icon: const Icon(Icons.rotate_right_outlined),
-                          iconSize: 100,
-                          color: Colors.white,
+                      //skrivamo reset button jer ga vise ne koristimo
+                      : Opacity(
+                          opacity: 0,
+                          child: IgnorePointer(
+                            child: IconButton(
+                              onPressed: widget.forwardTimer,
+                              icon: const Icon(Icons.rotate_right_outlined),
+                              iconSize: 100,
+                              color: Colors.white,
+                            ),
+                          ),
                         )
                 ],
               ),

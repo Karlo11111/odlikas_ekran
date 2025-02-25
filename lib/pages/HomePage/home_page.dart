@@ -151,7 +151,7 @@ class _HomePageState extends State<HomePage> {
                       child: InkWell(
                         onTap: () => Navigator.pushNamed(context, '/pomodoro'),
                         child: _buildContainer(
-                          label: "POMODORO MJERAČ VREMENA",
+                          label: "POMODORO \nMJERAČ VREMENA",
                           width: MediaQuery.of(context).size.width * 0.47,
                           height: MediaQuery.of(context).size.height * 0.463,
                         ),
@@ -165,7 +165,7 @@ class _HomePageState extends State<HomePage> {
                       child: InkWell(
                         onTap: () => Navigator.pushNamed(context, '/photomath'),
                         child: _buildContainer(
-                          label: "MATEMATIČKE BILJEŠKE",
+                          label: "ZNANSTVENE BILJEŠKE",
                           width: MediaQuery.of(context).size.width * 0.47,
                           height: MediaQuery.of(context).size.height * 0.463,
                         ),
@@ -216,7 +216,7 @@ class _HomePageState extends State<HomePage> {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: Colors.black,
+          color: Color.fromRGBO(113, 113, 113, 1),
           width: 1,
         ),
       ),
@@ -225,7 +225,8 @@ class _HomePageState extends State<HomePage> {
           label,
           textAlign: TextAlign.center,
           style: const TextStyle(
-            fontSize: 18, // font u containeru
+            color: Color.fromRGBO(113, 113, 113, 1),
+            fontSize: 32, // font u containeru
             fontWeight: FontWeight.w600,
           ),
         ),
