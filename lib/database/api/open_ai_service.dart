@@ -100,6 +100,143 @@ class OpenAiService {
     }
   }
 
+  // Nova metoda za generiranje sličnih zadataka
+  Future<List<Map<String, String>>?> generateSimilarTasks(
+      String originalLatexExpression) async {
+    final uri = Uri.parse("https://api.openai.com/v1/chat/completions");
+    final headers = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer $_apiKey",
+    };
+
+    // prompt za generiranje sličnih zadataka
+    final messages = [
+      {
+        "role": "system",
+        "content":
+            """Kao matematički asistent za učenike, generiraj slične matematičke zadatke u JSON formatu:
+      {
+        "similar_tasks": [
+          {
+            "difficulty": "lakši",
+            "task": "Matematički izraz u LaTeX-u",
+            "explanation": "Kako se razlikuje od originalnog zadatka"
+          },
+          {...}
+        ]
+      }
+
+      Pravila generiranja:
+      1. Generiraj ukupno 10 zadataka:
+         - 5 lakših od originala
+         - 2 iste težine (samo s različitim brojevima)
+         - 3 teža od originala
+      
+      2. Formatiranje:
+         - LaTeX format za matematičke izraze
+         - Koristi isti tip zadatka kao original (ako je jednadžba, generiraj jednadžbe)
+         - Odgovarajuće varijacije težine
+         
+      3. Objašnjenja:
+         - Kratko objasni po čemu je zadatak lakši ili teži od originala
+         - Za slične zadatke navedi koje vrijednosti su promijenjene"""
+      },
+      {
+        "role": "user",
+        "content":
+            """Generiraj slične zadatke za: ${_preprocessLatex(originalLatexExpression)}
+        
+        Molim te 10 zadataka prema pravilima:
+        - 5 lakših
+        - 2 ista zadatka s različitim brojevima
+        - 3 teža zadatka
+        
+        Svi zadaci trebaju biti u LaTeX formatu i s objašnjenjem kako se razlikuju od originala.
+        
+        Odgovori samo s čistim JSON-om bez Markdown oznaka poput ```json. Ne koristi oznake koda."""
+      }
+    ];
+
+    // tijelo zahtjeva
+    final body = {
+      "model": "gpt-4-turbo",
+      "messages": messages,
+      "max_tokens": 3000,
+      "temperature": 0.7, // malo veća temperatura za raznolikost zadataka
+    };
+
+    try {
+      // slanje zahtjeva
+      final response =
+          await http.post(uri, headers: headers, body: jsonEncode(body));
+      debugPrint(response.body);
+      return _handleSimilarTasksResponse(response);
+    } catch (e) {
+      debugPrint('Request failed: $e');
+      return null;
+    }
+  }
+
+  // metoda za obradu odgovora za slične zadatke
+  List<Map<String, String>>? _handleSimilarTasksResponse(
+      http.Response response) {
+    if (response.statusCode != 200) {
+      debugPrint('API Error: ${response.statusCode}');
+      return null;
+    }
+
+    try {
+      final data = jsonDecode(response.body);
+      final content = data['choices'][0]['message']['content']?.trim() ?? '';
+      return _parseSimilarTasksContent(content);
+    } catch (e) {
+      debugPrint('Response parsing error: $e');
+      return null;
+    }
+  }
+
+  // metoda za parsiranje sadržaja odgovora za slične zadatke
+  List<Map<String, String>>? _parseSimilarTasksContent(String content) {
+    try {
+      // Remove Markdown code block markers if present
+      String cleanedContent = content;
+      if (content.startsWith('```')) {
+        final firstLineEnd = content.indexOf('\n');
+        if (firstLineEnd != -1) {
+          cleanedContent = content.substring(firstLineEnd + 1);
+          if (cleanedContent.endsWith('```')) {
+            cleanedContent =
+                cleanedContent.substring(0, cleanedContent.length - 3);
+          }
+        }
+      }
+
+      cleanedContent = cleanedContent.trim();
+      debugPrint('Cleaned JSON: $cleanedContent');
+
+      final jsonData = jsonDecode(cleanedContent) as Map<String, dynamic>;
+      final tasks = jsonData['similar_tasks'] as List<dynamic>;
+
+      return tasks.map<Map<String, String>>((task) {
+        final taskData = task as Map<String, dynamic>;
+
+        // Print the raw task for debugging
+        final rawTask = taskData['task']?.toString() ?? '';
+        debugPrint('Raw task from JSON: $rawTask');
+
+        return {
+          'difficulty': _cleanText(taskData['difficulty']?.toString() ?? ''),
+          'task': rawTask, // Use the raw LaTeX string directly
+          'explanation': _cleanText(taskData['explanation']?.toString() ?? ''),
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Content processing failed: $e');
+      debugPrint('Raw content: $content');
+      return null;
+    }
+  }
+
   // metoda za obradu odgovora API-ja
   List<Map<String, String>>? _handleApiResponse(http.Response response) {
     if (response.statusCode != 200) {

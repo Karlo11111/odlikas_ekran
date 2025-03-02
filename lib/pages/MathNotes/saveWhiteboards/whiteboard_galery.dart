@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:odlikas_ekran/pages/MathNotes/math_notes.dart';
 import 'whiteboard_data.dart';
-import 'package:intl/intl.dart';
 
 class WhiteboardGalleryPage extends StatefulWidget {
   const WhiteboardGalleryPage({super.key});
@@ -22,6 +21,29 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
     whiteboardsBox = Hive.box<WhiteboardData>('whiteboards');
   }
 
+  void _createNewNote(BuildContext context) async {
+    final newNote = WhiteboardData(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: "Nova bilješka ${DateTime.now().day}.${DateTime.now().month}",
+      lastModified: DateTime.now(),
+      paths: [],
+      transformationMatrix: Matrix4.identity().storage.toList(),
+      currentScale: 1.0,
+      textElements: [],
+    );
+
+    final box = Hive.box<WhiteboardData>('whiteboards');
+    final key = await box.add(newNote);
+    final savedNote = box.get(key);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MathNotes(whiteboardData: savedNote!),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,7 +55,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 25),
+                    padding: const EdgeInsets.only(top: 50),
                     child: Row(
                       children: [
                         // RETURN BUTTON
@@ -49,7 +71,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                           },
                         ),
                         SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.27,
+                          width: MediaQuery.of(context).size.width * 0.3,
                         ),
 
                         Row(
@@ -57,9 +79,9 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                           children: [
                             const SizedBox(height: 20),
                             Text(
-                              "Matematičke bilješke",
+                              "Znanstvene bilješke",
                               style: GoogleFonts.inter(
-                                  fontSize: 36, fontWeight: FontWeight.w800),
+                                  fontSize: 36, fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
@@ -68,18 +90,74 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.only(left: 60, top: 30),
                   sliver: SliverGrid(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 4,
-                      crossAxisSpacing: 20,
-                      mainAxisSpacing: 20,
+                      crossAxisSpacing: 40,
+                      mainAxisSpacing: 40,
                       childAspectRatio: 1.2,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
-                        if (index == 0) return _AddNewWhiteboardCard();
+                        if (index == 0) {
+                          // Special handling for the "Add New" card
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // White container with blue plus icon
+                              AspectRatio(
+                                aspectRatio:
+                                    1.5, // Match the aspect ratio from the image
+                                child: GestureDetector(
+                                  onTap: () => _createNewNote(context),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.15),
+                                          blurRadius: 6,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: Container(
+                                        width: 43,
+                                        height: 43,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF2196F3),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.add,
+                                          size: 40,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              // Text below the container
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4),
+                                child: Text(
+                                  "Dodaj novu bilješku",
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+
                         final whiteboard = box.getAt(index - 1);
                         return _WhiteboardCard(
                           whiteboard: whiteboard!,
@@ -97,61 +175,6 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
   }
 }
 
-class _AddNewWhiteboardCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _createNewWhiteboard(context),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.blue, width: 2),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.add, size: 60, color: Colors.blue),
-            const SizedBox(height: 10),
-            Text(
-              "Dodaj novu bilješku",
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.blue,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _createNewWhiteboard(BuildContext context) async {
-    final newWhiteboard = WhiteboardData(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: "Nova bilješka ${DateTime.now().day}.${DateTime.now().month}",
-      lastModified: DateTime.now(),
-      paths: [],
-      transformationMatrix: Matrix4.identity().storage.toList(),
-      currentScale: 1.0,
-      textElements: [],
-    );
-
-    final box = Hive.box<WhiteboardData>('whiteboards');
-    final key = await box.add(newWhiteboard); // Add to Hive to assign a key
-    final savedWhiteboard =
-        box.get(key); // Retrieve the version with a Hive key
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MathNotes(whiteboardData: savedWhiteboard!),
-      ),
-    );
-  }
-}
-
 class _WhiteboardCard extends StatelessWidget {
   final WhiteboardData whiteboard;
   final int index;
@@ -160,66 +183,53 @@ class _WhiteboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _openWhiteboard(context),
-      onLongPress: () => _showContextMenu(context),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
-                  color: Colors.white,
-                ),
-                // ako je screenshot dostupan pokazi ga, inace prikazi text "No Preview"
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // White container with content
+        AspectRatio(
+          aspectRatio: 1.5, // Match the aspect ratio from the image
+          child: GestureDetector(
+            onTap: () => _openWhiteboard(context),
+            onLongPress: () => _showContextMenu(context),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              // Show screenshot or example content
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
                 child: whiteboard.screenshot != null
                     ? Image.memory(
                         whiteboard.screenshot!,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.error_outline),
                       )
                     : const Center(child: Text("No Preview")),
               ),
             ),
-            Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      whiteboard.name,
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      "Zadnja promjena: ${DateFormat('dd.MM.yyyy HH:mm').format(whiteboard.lastModified)}",
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                )),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        // Project name below the container
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            whiteboard.name,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

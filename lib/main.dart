@@ -6,6 +6,7 @@ import 'package:odlikas_ekran/pages/Grades/grades_page.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_galery.dart';
 import 'package:odlikas_ekran/pages/PomodoroTimer/pomodoro_timer_page.dart';
+import 'package:odlikas_ekran/pages/ToDoList/todo_list.dart';
 import 'package:odlikas_ekran/viewmodels/test_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -99,6 +100,7 @@ class MyApp extends StatelessWidget {
           '/calendar': (context) => const CalendarPage(),
           '/pomodoro': (context) => const PomodoroTimerPage(),
           '/photomath': (context) => const WhiteboardGalleryPage(),
+          '/todo': (context) => const TodoList(),
         },
       ),
     );

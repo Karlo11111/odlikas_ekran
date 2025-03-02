@@ -123,10 +123,13 @@ class _HomePageState extends State<HomePage> {
                     Positioned(
                       left: MediaQuery.of(context).size.width * 0.02,
                       top: MediaQuery.of(context).size.height * 0.02,
-                      child: _buildContainer(
-                        label: "POPIS OBVEZA",
-                        width: MediaQuery.of(context).size.width * 0.47,
-                        height: MediaQuery.of(context).size.height * 0.463,
+                      child: InkWell(
+                        onTap: () => Navigator.pushNamed(context, '/todo'),
+                        child: _buildContainer(
+                          label: "POPIS OBVEZA",
+                          width: MediaQuery.of(context).size.width * 0.47,
+                          height: MediaQuery.of(context).size.height * 0.463,
+                        ),
                       ),
                     ),
 
@@ -198,9 +201,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ],
                 ))
-              : const Center(
-                  child: Text("No data available"),
-                ),
+              : const Center(),
     );
   }
 

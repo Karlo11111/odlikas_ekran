@@ -10,6 +10,8 @@ import 'package:hive/hive.dart';
 import 'package:latext/latext.dart';
 import 'package:odlikas_ekran/database/api/matpix_ai_solving.dart';
 import 'package:odlikas_ekran/database/api/open_ai_service.dart';
+import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_shape.dart';
+import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_painters.dart';
 import 'package:odlikas_ekran/pages/MathNotes/TextAdding/text_model.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/debouncer.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.dart';
@@ -34,6 +36,7 @@ class MathNotes extends StatefulWidget {
 }
 
 class _MathNotesState extends State<MathNotes> {
+  GlobalKey _whiteboardKey = GlobalKey();
   // color paleta za biranje boja
   final List<Map<String, Color>> _colorPalette = [
     {'color': Colors.white, 'border': const Color(0xFFC7C7C7)},
@@ -90,7 +93,7 @@ class _MathNotesState extends State<MathNotes> {
 
   Offset? _lastPanOffset;
 
-  final List<DrawingPath> _redoStack = [];
+  final List<dynamic> _redoStack = [];
 
   bool _showPenOptions = false;
   bool _showColorOptions = false;
@@ -99,11 +102,18 @@ class _MathNotesState extends State<MathNotes> {
   bool _isSelectingArea = false;
   Offset? _selectionStart;
   Offset? _selectionEnd;
-  GlobalKey _whiteboardKey = GlobalKey();
 
   //text creating
   List<TextElement> _textElements = [];
   TextElement? _selectedTextElement;
+
+  //shapes drawing
+  // Add these class variables to your state class
+  bool _showShapeOptions = false;
+  ShapeType _currentShapeType = ShapeType.circle;
+  ShapeShape? _currentShape; // For tracking shape being drawn
+  // Add a list to store shapes
+  List<ShapeShape> _shapes = [];
 
   // this is for the ai mathpix image
   Uint8List? _capturedImage;
@@ -125,9 +135,11 @@ class _MathNotesState extends State<MathNotes> {
     _whiteboardsBox = Hive.box<WhiteboardData>('whiteboards');
     _whiteboardData = widget.whiteboardData!;
     _loadSavedState();
+
+    // Delay the first autosave to ensure rendering is complete
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Future.delayed(
-          const Duration(milliseconds: 100)); // Additional safety delay
+      // Wait for multiple frames to render
+      await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
         await _autoSave(force: true);
       }
@@ -152,6 +164,9 @@ class _MathNotesState extends State<MathNotes> {
 
     _textElements = _whiteboardData.textElements
         .map((te) => TextElement.fromMap(_convertMap(te)))
+        .toList();
+    _shapes = _whiteboardData.shapes
+        .map((shape) => ShapeShape.fromMap(_convertMap(shape)))
         .toList();
   }
 
@@ -192,42 +207,47 @@ class _MathNotesState extends State<MathNotes> {
 
   Future<void> _saveNow() async {
     try {
-      // Create a DEEP copy to preserve nested data relationships
-      final updatedData = WhiteboardData(
-        id: _whiteboardData.id,
-        name: _whiteboardData.name,
-        lastModified: DateTime.now(),
-        paths: List<Map<String, dynamic>>.from(_paths.map((p) => p.toMap())),
-        transformationMatrix: List<double>.from(_transformationMatrix.storage),
-        currentScale: _currentScale,
-        screenshot: _whiteboardData.screenshot, // Preserve existing
-        textElements: List<Map<String, dynamic>>.from(
-            _textElements.map((te) => te.toMap())),
-      );
+      // Don't create a whole new object, instead update the existing one
+      // This preserves the Hive key/reference
+      _whiteboardData.lastModified = DateTime.now();
+      _whiteboardData.paths =
+          List<Map<String, dynamic>>.from(_paths.map((p) => p.toMap()));
+      _whiteboardData.transformationMatrix =
+          List<double>.from(_transformationMatrix.storage);
+      _whiteboardData.currentScale = _currentScale;
+      _whiteboardData.textElements = List<Map<String, dynamic>>.from(
+          _textElements.map((te) => te.toMap()));
+      _whiteboardData.shapes =
+          List<Map<String, dynamic>>.from(_shapes.map((s) => s.toMap()));
 
-      // Capture new screenshot
-      if (_whiteboardKey.currentContext?.mounted == true) {
+      // Safely capture new screenshot
+      if (_whiteboardKey.currentContext != null &&
+          _whiteboardKey.currentContext!.findRenderObject() != null &&
+          _whiteboardKey.currentContext!.findRenderObject()
+              is RenderRepaintBoundary) {
         final boundary = _whiteboardKey.currentContext!.findRenderObject()
             as RenderRepaintBoundary;
 
         // Wait for stable frame
         await SchedulerBinding.instance.endOfFrame;
         if (boundary.debugNeedsPaint) {
-          await Future.delayed(const Duration(milliseconds: 16));
+          await Future.delayed(const Duration(milliseconds: 50));
         }
 
-        final uiImage = await boundary.toImage(pixelRatio: 2.5);
-        final byteData =
-            await uiImage.toByteData(format: ui.ImageByteFormat.png);
-        updatedData.screenshot = byteData?.buffer.asUint8List();
+        try {
+          final uiImage = await boundary.toImage(pixelRatio: 2.5);
+          final byteData =
+              await uiImage.toByteData(format: ui.ImageByteFormat.png);
+          if (byteData != null) {
+            _whiteboardData.screenshot = byteData.buffer.asUint8List();
+          }
+        } catch (screenshotError) {
+          debugPrint('Screenshot capture error: $screenshotError');
+        }
       }
 
-      // Update Hive entry using original key
-      final box = Hive.box<WhiteboardData>('whiteboards');
-      await box.put(_whiteboardData.key, updatedData);
-
-      // Refresh local reference
-      _whiteboardData = box.get(_whiteboardData.key)!;
+      // Save the modified existing object
+      await _whiteboardData.save();
     } catch (e, stack) {
       debugPrint('Save error: $e\n$stack');
     }
@@ -290,8 +310,10 @@ class _MathNotesState extends State<MathNotes> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            SolutionStepsPage(steps: openAiResult),
+                        builder: (context) => SolutionStepsPage(
+                          steps: openAiResult,
+                          originalTask: sanitized,
+                        ),
                       ),
                     );
                   }
@@ -414,35 +436,202 @@ class _MathNotesState extends State<MathNotes> {
           // ----------------------------------------------------------
           RepaintBoundary(
             key: _whiteboardKey,
-            child: GestureDetector(
-              onScaleStart: _handleScaleStart,
-              onScaleUpdate: _handleScaleUpdate,
-              onScaleEnd: _handleScaleEnd,
-              onTapDown: (details) {
-                if (_currentTool == ToolMode.text) {
-                  final newElement = TextElement(
-                    id: DateTime.now().microsecondsSinceEpoch.toString(),
-                    position: _transformPoint(details.localPosition),
-                    fontSize: 24, // Store base font size (not scaled)
-                    size: Size(150, 50), // Store base size (not scaled)
-                    isEditing: true,
-                  );
-                  setState(() {
-                    _textElements.add(newElement);
-                    _selectedTextElement = newElement;
-                  });
-                }
-              },
-              child: CustomPaint(
-                painter: WhiteboardPainter(
-                  paths: _paths,
-                  transformationMatrix: _transformationMatrix,
-                  currentColor: _currentColor,
-                  currentPath: _currentPath,
-                  strokeWidth: _strokeWidth,
+            // stack da kada se uzme screenshot za whiteboard preview da se vide tekst i oblici
+            child: Stack(
+              children: [
+                GestureDetector(
+                  onScaleStart: _handleScaleStart,
+                  onScaleUpdate: _handleScaleUpdate,
+                  onScaleEnd: _handleScaleEnd,
+                  onTapDown: (details) {
+                    if (_currentTool == ToolMode.text) {
+                      final newElement = TextElement(
+                        id: DateTime.now().microsecondsSinceEpoch.toString(),
+                        position: _transformPoint(details.localPosition),
+                        fontSize: 24, // Store base font size (not scaled)
+                        size: Size(150, 50), // Store base size (not scaled)
+                        isEditing: true,
+                      );
+                      setState(() {
+                        _textElements.add(newElement);
+                        _selectedTextElement = newElement;
+                      });
+                    }
+                  },
+                  child: CustomPaint(
+                    painter: WhiteboardPainter(
+                      paths: _paths,
+                      transformationMatrix: _transformationMatrix,
+                      currentColor: _currentColor,
+                      currentPath: _currentPath,
+                      strokeWidth: _strokeWidth,
+                      shapes: _shapes,
+                      currentShape: _currentShape,
+                    ),
+                    size: Size.infinite,
+                  ),
                 ),
-                size: Size.infinite,
-              ),
+                // dodavanje pravog texta ne rukopis
+                ..._textElements.map((element) {
+                  // 1) In board space, the rectangle corners:
+                  //    top-left = element.position
+                  //    bottom-right = element.position + element.size
+                  final Offset boardTopLeft = element.position;
+                  final Offset boardBottomRight = element.position +
+                      Offset(element.size.width, element.size.height);
+
+                  // 2) Convert both corners to screen space:
+                  final Offset screenTopLeft = _applyMatrix(boardTopLeft);
+                  final Offset screenBottomRight =
+                      _applyMatrix(boardBottomRight);
+
+                  // 3) The resulting bounding box in screen space:
+                  double boxLeft = screenTopLeft.dx;
+                  double boxTop = screenTopLeft.dy;
+                  double boxRight = screenBottomRight.dx;
+                  double boxBottom = screenBottomRight.dy;
+
+                  // If your transform can flip coordinates (e.g. negative scaling),
+                  // ensure left < right and top < bottom by sorting:
+                  if (boxRight < boxLeft) {
+                    final temp = boxLeft;
+                    boxLeft = boxRight;
+                    boxRight = temp;
+                  }
+                  if (boxBottom < boxTop) {
+                    final temp = boxTop;
+                    boxTop = boxBottom;
+                    boxBottom = temp;
+                  }
+
+                  final double boxWidth = boxRight - boxLeft;
+                  final double boxHeight = boxBottom - boxTop;
+
+                  // 4) Derive a scale factor for the font:
+                  //    - For simplicity, scale by ratio of screenHeight to boardHeight.
+                  //    - If there's no rotation or severe distortion, this is fine.
+                  //    - If you do rotate the board, you'd need more advanced handling.
+                  double boardHeight = element.size.height;
+                  double fontScale =
+                      (boardHeight == 0) ? 1 : (boxHeight / boardHeight);
+                  if (fontScale.isNaN || fontScale.isInfinite) {
+                    fontScale = 1; // fallback if something weird
+                  }
+                  final double finalFontSize = element.fontSize * fontScale;
+
+                  return Positioned(
+                    left: boxLeft,
+                    top: boxTop,
+                    // Use the scaled size in screen coordinates
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+
+                      // Select text if user long-presses
+                      onLongPress: () {
+                        setState(() {
+                          _selectedTextElement = element;
+                          _currentTool = ToolMode.text;
+                        });
+                      },
+
+                      // Fixed: Drag the text in board space considering transformations
+                      onPanUpdate: (details) {
+                        setState(() {
+                          // Get the inverse of the transformation matrix
+                          final inverseMatrix =
+                              Matrix4.inverted(_transformationMatrix);
+
+                          // Convert the delta to board space
+                          final deltaVec = inverseMatrix.transform3(
+                            vm.Vector3(details.delta.dx, details.delta.dy, 0),
+                          );
+
+                          // Update position with the proper transformation
+                          element.position += Offset(deltaVec.x, deltaVec.y);
+                        });
+                      },
+
+                      child: Container(
+                        width: boxWidth,
+                        height: boxHeight,
+                        decoration: BoxDecoration(
+                          border: (_selectedTextElement == element)
+                              ? Border.all(color: Colors.blue, width: 1)
+                              : null,
+                        ),
+                        child: Stack(
+                          children: [
+                            // Editing vs. displayed text
+                            if (element.isEditing)
+                              TextField(
+                                autofocus: true,
+                                style: TextStyle(fontSize: finalFontSize),
+                                onChanged: (value) => element.text = value,
+                                onSubmitted: (value) {
+                                  setState(() => element.isEditing = false);
+                                },
+                              )
+                            else
+                              Text(
+                                element.text,
+                                style: TextStyle(fontSize: finalFontSize),
+                              ),
+
+                            // Resize handle if this is the selected text
+                            if (_selectedTextElement == element)
+                              Positioned(
+                                right:
+                                    -10, // handle sits partly outside to appear as a corner
+                                bottom: -10,
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onPanUpdate: (details) {
+                                    setState(() {
+                                      final inverseMatrix = Matrix4.inverted(
+                                          _transformationMatrix);
+
+                                      // Convert the delta to board space
+                                      final deltaVec = inverseMatrix.transform3(
+                                        vm.Vector3(details.delta.dx,
+                                            details.delta.dy, 0),
+                                      );
+
+                                      // Apply a damping factor to make scaling less sensitive
+                                      double dampingFactor = 0.5;
+
+                                      // Update size with damping
+                                      double newW = element.size.width +
+                                          (deltaVec.x * dampingFactor);
+                                      double newH = element.size.height +
+                                          (deltaVec.y * dampingFactor);
+
+                                      // Clamp to avoid going negative
+                                      if (newW < 20) newW = 20;
+                                      if (newH < 20) newH = 20;
+
+                                      element.size = Size(newW, newH);
+                                      element.fontSize =
+                                          newH * 0.6; // 60% of height
+                                    });
+                                  },
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
           // return botun
@@ -515,52 +704,159 @@ class _MathNotesState extends State<MathNotes> {
                     const SizedBox(height: 16),
 
                     // Color Grid
-                    SizedBox(
-                      width: 180,
-                      height: 180,
-                      child: GridView.builder(
-                        padding: EdgeInsets.zero,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                        ),
-                        itemCount: _colorPalette.length,
-                        itemBuilder: (context, index) {
-                          final colorData = _colorPalette[index];
-                          return GestureDetector(
-                            onTap: () => setState(() {
-                              _toolSettings[_drawingMode]!.color =
-                                  colorData['color']!;
-                              _currentColor = colorData['color']!;
-                            }),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: colorData['color'],
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: colorData['border']!,
-                                      width: 2,
+                    if (_drawingMode != DrawingMode.eraser)
+                      SizedBox(
+                        width: 180,
+                        height: 180,
+                        child: GridView.builder(
+                          padding: EdgeInsets.zero,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            mainAxisSpacing: 10,
+                            crossAxisSpacing: 10,
+                          ),
+                          itemCount: _colorPalette.length,
+                          itemBuilder: (context, index) {
+                            final colorData = _colorPalette[index];
+                            return GestureDetector(
+                              onTap: () => setState(() {
+                                if (_drawingMode == DrawingMode.marker) {
+                                  // transparentno za marker mode
+                                  _toolSettings[_drawingMode]!.color =
+                                      colorData['color']!.withOpacity(0.5);
+                                  _currentColor =
+                                      colorData['color']!.withOpacity(0.5);
+                                } else {
+                                  _toolSettings[_drawingMode]!.color =
+                                      colorData['color']!;
+                                  _currentColor = colorData['color']!;
+                                }
+                              }),
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: colorData['color'],
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: colorData['border']!,
+                                        width: 2,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                if (_currentColor == colorData['color'])
-                                  SvgPicture.string(
-                                    '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M11.4669 3.72684C11.7558 3.91574 11.8369 4.30308 11.648 4.59198L7.39799 11.092C7.29783 11.2452 7.13556 11.3467 6.95402 11.3699C6.77247 11.3931 6.58989 11.3355 6.45446 11.2124L3.70446 8.71241C3.44905 8.48022 3.43023 8.08494 3.66242 7.82953C3.89461 7.57412 4.28989 7.55529 4.5453 7.78749L6.75292 9.79441L10.6018 3.90792C10.7907 3.61902 11.178 3.53795 11.4669 3.72684Z" fill="white"/></svg>',
-                                    width: 30,
-                                    height: 30,
-                                  ),
-                              ],
-                            ),
-                          );
-                        },
+                                  if (_currentColor == colorData['color'])
+                                    SvgPicture.string(
+                                      '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M11.4669 3.72684C11.7558 3.91574 11.8369 4.30308 11.648 4.59198L7.39799 11.092C7.29783 11.2452 7.13556 11.3467 6.95402 11.3699C6.77247 11.3931 6.58989 11.3355 6.45446 11.2124L3.70446 8.71241C3.44905 8.48022 3.43023 8.08494 3.66242 7.82953C3.89461 7.57412 4.28989 7.55529 4.5453 7.78749L6.75292 9.79441L10.6018 3.90792C10.7907 3.61902 11.178 3.53795 11.4669 3.72684Z" fill="white"/></svg>',
+                                      width: 30,
+                                      height: 30,
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                       ),
+                  ],
+                ),
+              ),
+            ),
+
+          //prikazivanje widgeta za biranje vrstu oblika (krug, kvadrat, trokut, heksagon)
+          if (_showShapeOptions)
+            Positioned(
+              right: 100,
+              top: MediaQuery.of(context).size.height / 2 - 150,
+              child: Container(
+                decoration: _panelDecoration,
+                child: Column(
+                  children: [
+                    // Circle shape
+                    ToolButton(
+                      isActive: _currentShapeType == ShapeType.circle,
+                      onPressed: () {
+                        setState(() {
+                          _currentShapeType = ShapeType.circle;
+                        });
+                      },
+                      child: Container(
+                        width: 35,
+                        height: 35,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _currentShapeType == ShapeType.circle
+                                ? Colors.blue
+                                : Colors.grey,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Square shape
+                    ToolButton(
+                      isActive: _currentShapeType == ShapeType.square,
+                      onPressed: () {
+                        setState(() {
+                          _currentShapeType = ShapeType.square;
+                        });
+                      },
+                      child: Container(
+                        width: 35,
+                        height: 35,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _currentShapeType == ShapeType.square
+                                ? Colors.blue
+                                : Colors.grey,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Triangle shape
+                    ToolButton(
+                      isActive: _currentShapeType == ShapeType.triangle,
+                      onPressed: () {
+                        setState(() {
+                          _currentShapeType = ShapeType.triangle;
+                        });
+                      },
+                      child: CustomPaint(
+                        size: const Size(35, 35),
+                        painter: TrianglePainter(
+                          color: _currentShapeType == ShapeType.triangle
+                              ? Colors.blue
+                              : Colors.grey,
+                        ),
+                      ),
+                    ),
+                    // Hexagon shape
+                    ToolButton(
+                      isActive: _currentShapeType == ShapeType.hexagon,
+                      onPressed: () {
+                        setState(() {
+                          _currentShapeType = ShapeType.hexagon;
+                        });
+                      },
+                      child: CustomPaint(
+                        size: const Size(35, 35),
+                        painter: HexagonPainter(
+                          color: _currentShapeType == ShapeType.hexagon
+                              ? Colors.blue
+                              : Colors.grey,
+                        ),
+                      ),
+                    ),
+                    // Color/width indicator
+                    ToolButton(
+                      child: ColorWidthIndicator(
+                          color: _currentColor, strokeWidth: _strokeWidth),
+                      onPressed: () => setState(
+                          () => _showColorOptions = !_showColorOptions),
                     ),
                   ],
                 ),
@@ -571,7 +867,7 @@ class _MathNotesState extends State<MathNotes> {
           if (_showPenOptions)
             Positioned(
               right: 100,
-              top: MediaQuery.of(context).size.height / 2 - 120,
+              top: MediaQuery.of(context).size.height / 2 - 150,
               child: Container(
                 decoration: _panelDecoration,
                 child: Column(
@@ -587,26 +883,35 @@ class _MathNotesState extends State<MathNotes> {
                           _showColorOptions = false;
                         });
                       },
-                      child: Icon(Icons.edit,
-                          color: _drawingMode == DrawingMode.pen
-                              ? const Color.fromRGBO(23, 148, 210, 1)
-                              : Colors.black),
+                      child: Image.asset(
+                        _drawingMode == DrawingMode.pen
+                            ? 'assets/icons/notes_pen_selected.png'
+                            : 'assets/icons/notes_pen.png',
+                        width: 35,
+                        height: 35,
+                      ),
                     ),
                     ToolButton(
-                        isActive: _drawingMode == DrawingMode.marker,
-                        onPressed: () {
-                          setState(() {
-                            _drawingMode = DrawingMode.marker;
-                            _currentColor = _toolSettings[_drawingMode]!.color;
-                            _strokeWidth =
-                                _toolSettings[_drawingMode]!.strokeWidth;
-                            _showColorOptions = false;
-                          });
-                        },
-                        child: Icon(Icons.brush,
-                            color: _drawingMode == DrawingMode.marker
-                                ? const Color.fromRGBO(23, 148, 210, 1)
-                                : Colors.black)),
+                      isActive: _drawingMode == DrawingMode.marker,
+                      onPressed: () {
+                        setState(() {
+                          _drawingMode = DrawingMode.marker;
+                          _currentColor = _toolSettings[_drawingMode]!
+                              .color
+                              .withOpacity(0.5); // transparentno
+                          _strokeWidth =
+                              _toolSettings[_drawingMode]!.strokeWidth;
+                          _showColorOptions = false;
+                        });
+                      },
+                      child: Image.asset(
+                        _drawingMode == DrawingMode.marker
+                            ? 'assets/icons/notes_marker_selected.png'
+                            : 'assets/icons/notes_marker.png',
+                        width: 35,
+                        height: 35,
+                      ),
+                    ),
                     ToolButton(
                       isActive: _drawingMode == DrawingMode.eraser,
                       onPressed: () {
@@ -618,10 +923,13 @@ class _MathNotesState extends State<MathNotes> {
                           _showColorOptions = false;
                         });
                       },
-                      child: Icon(Icons.cleaning_services,
-                          color: _drawingMode == DrawingMode.eraser
-                              ? const Color.fromRGBO(23, 148, 210, 1)
-                              : Colors.black),
+                      child: Image.asset(
+                        _drawingMode == DrawingMode.eraser
+                            ? 'assets/icons/notes_eraser_selected.png'
+                            : 'assets/icons/notes_eraser.png',
+                        width: 35,
+                        height: 35,
+                      ),
                     ),
                     ToolButton(
                       child: ColorWidthIndicator(
@@ -634,10 +942,33 @@ class _MathNotesState extends State<MathNotes> {
               ),
             ),
 
+          // upload gumb
+          Positioned(
+            right: 20,
+            top: MediaQuery.of(context).size.height / 2 - 260,
+            child: Container(
+              decoration: _panelDecoration,
+              child: ToolButton(
+                onPressed: () {
+                  _changeTool(ToolMode.pen);
+                  setState(() {
+                    _showPenOptions = !_showPenOptions;
+                    _showColorOptions = false;
+                  });
+                },
+                child: Image.asset(
+                  'assets/icons/notes_upload.png',
+                  width: 35,
+                  height: 35,
+                ),
+              ),
+            ),
+          ),
+
           // glavni panel za biranje alata
           Positioned(
             right: 20,
-            top: MediaQuery.of(context).size.height / 2 - 170,
+            top: MediaQuery.of(context).size.height / 2 - 190,
             child: Column(
               children: [
                 Container(
@@ -646,7 +977,14 @@ class _MathNotesState extends State<MathNotes> {
                     children: [
                       ToolButton(
                         isActive: _currentTool == ToolMode.hand,
-                        onPressed: () => _changeTool(ToolMode.hand),
+                        onPressed: () {
+                          _changeTool(ToolMode.hand);
+                          setState(() {
+                            _showPenOptions = false;
+                            _showShapeOptions = false;
+                            _showColorOptions = false;
+                          });
+                        },
                         child: Icon(Icons.pan_tool,
                             color: _currentTool == ToolMode.hand
                                 ? const Color.fromRGBO(23, 148, 210, 1)
@@ -658,25 +996,53 @@ class _MathNotesState extends State<MathNotes> {
                           _changeTool(ToolMode.pen);
                           setState(() {
                             _showPenOptions = !_showPenOptions;
+                            _showShapeOptions = false;
                             _showColorOptions = false;
                           });
                         },
-                        child: Icon(Icons.edit,
-                            color: _currentTool == ToolMode.pen
-                                ? const Color.fromRGBO(23, 148, 210, 1)
-                                : Colors.black),
+                        child: Image.asset(
+                          _currentTool == ToolMode.pen
+                              ? 'assets/icons/notes_pen_selected.png'
+                              : 'assets/icons/notes_pen.png',
+                          width: 35,
+                          height: 35,
+                        ),
                       ),
                       ToolButton(
                         isActive: _currentTool == ToolMode.text,
-                        onPressed: () => _changeTool(ToolMode.text),
-                        child: Icon(Icons.text_fields,
-                            color: _currentTool == ToolMode.text
-                                ? const Color.fromRGBO(23, 148, 210, 1)
-                                : Colors.black),
+                        onPressed: () {
+                          _changeTool(ToolMode.text);
+                          setState(() {
+                            _showPenOptions = false;
+                            _showColorOptions = false;
+                            _showShapeOptions = false;
+                          });
+                        },
+                        child: Image.asset(
+                          _currentTool == ToolMode.text
+                              ? 'assets/icons/notes_text.png'
+                              : 'assets/icons/notes_text.png',
+                          width: 35,
+                          height: 35,
+                        ),
                       ),
                       ToolButton(
-                        child: const Icon(Icons.shape_line),
-                        onPressed: () {},
+                        isActive: _currentTool == ToolMode.shape,
+                        child: Image.asset(
+                          _currentTool == ToolMode.shape
+                              ? 'assets/icons/notes_shapes_selected.png'
+                              : 'assets/icons/notes_shapes.png',
+                          width: 35,
+                          height: 35,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _currentTool = ToolMode.shape;
+                            _showPenOptions = false;
+                            _showShapeOptions = !_showShapeOptions;
+                            _showColorOptions = false;
+                          });
+                        },
                       ),
                       ToolButton(
                         isActive: _currentTool == ToolMode.ai,
@@ -684,14 +1050,15 @@ class _MathNotesState extends State<MathNotes> {
                           _currentTool == ToolMode.ai
                               ? 'assets/icons/screen_sidebar_ai_selected.svg'
                               : 'assets/icons/screen_sidebar_ai.svg',
-                          width: 30,
-                          height: 30,
+                          width: 35,
+                          height: 35,
                         ),
                         onPressed: () {
                           _changeTool(ToolMode.ai);
                           setState(() {
                             _isSelectingArea = true;
                             // Disable other tools while selecting
+                            _showShapeOptions = false;
                             _currentTool = ToolMode.ai;
                             _showPenOptions = false;
                             _showColorOptions = false;
@@ -708,9 +1075,20 @@ class _MathNotesState extends State<MathNotes> {
                   child: Column(
                     children: [
                       ToolButton(
-                          onPressed: _undo, child: const Icon(Icons.undo)),
+                        onPressed: _undo,
+                        child: Image.asset(
+                          'assets/icons/notes_undo.png',
+                          width: 35,
+                          height: 35,
+                        ),
+                      ),
                       ToolButton(
-                          onPressed: _redo, child: const Icon(Icons.redo)),
+                          onPressed: _redo,
+                          child: Image.asset(
+                            'assets/icons/notes_redo.png',
+                            width: 35,
+                            height: 35,
+                          )),
                     ],
                   ),
                 ),
@@ -718,7 +1096,37 @@ class _MathNotesState extends State<MathNotes> {
             ),
           ),
 
+          //AI selekcija i panel za prikazivanje uputa
           if (_isSelectingArea) _buildSelectionOverlay(),
+          if (_isSelectingArea)
+            Positioned(
+              top: 50.0,
+              left: MediaQuery.of(context).size.width * 0.25,
+              right: MediaQuery.of(context).size.width * 0.25,
+              child: Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15.0),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 10.0,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'Odaberite mali prozorčić gdje naš AI može brzo i točno izračunati što trebate.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ),
 
           // panel za prikazivanje latex rezultata (rezultata AI)
           if (_isOpenAiLoading)
@@ -776,15 +1184,6 @@ class _MathNotesState extends State<MathNotes> {
                         ),
                       ),
                     ],
-
-                    // Optional: A button to go to another page for more steps
-                    // if (!_isOpenAiLoading && _openAiAnswer != null)
-                    //   ElevatedButton(
-                    //     onPressed: () {
-                    //       // Navigate to a more detailed steps page
-                    //     },
-                    //     child: Text("View Steps"),
-                    //   ),
                   ],
                 ),
               ),
@@ -792,8 +1191,8 @@ class _MathNotesState extends State<MathNotes> {
 
           // Bottom panel za zoomiranje
           Positioned(
-            left: 20,
-            bottom: 20,
+            left: 30,
+            bottom: 30,
             child: Container(
               decoration: _panelDecoration,
               child: Row(
@@ -820,152 +1219,6 @@ class _MathNotesState extends State<MathNotes> {
               ),
             ),
           ),
-
-          ..._textElements.map((element) {
-            // 1) In board space, the rectangle corners:
-            //    top-left = element.position
-            //    bottom-right = element.position + element.size
-            final Offset boardTopLeft = element.position;
-            final Offset boardBottomRight = element.position +
-                Offset(element.size.width, element.size.height);
-
-            // 2) Convert both corners to screen space:
-            final Offset screenTopLeft = _applyMatrix(boardTopLeft);
-            final Offset screenBottomRight = _applyMatrix(boardBottomRight);
-
-            // 3) The resulting bounding box in screen space:
-            double boxLeft = screenTopLeft.dx;
-            double boxTop = screenTopLeft.dy;
-            double boxRight = screenBottomRight.dx;
-            double boxBottom = screenBottomRight.dy;
-
-            // If your transform can flip coordinates (e.g. negative scaling),
-            // ensure left < right and top < bottom by sorting:
-            if (boxRight < boxLeft) {
-              final temp = boxLeft;
-              boxLeft = boxRight;
-              boxRight = temp;
-            }
-            if (boxBottom < boxTop) {
-              final temp = boxTop;
-              boxTop = boxBottom;
-              boxBottom = temp;
-            }
-
-            final double boxWidth = boxRight - boxLeft;
-            final double boxHeight = boxBottom - boxTop;
-
-            // 4) Derive a scale factor for the font:
-            //    - For simplicity, scale by ratio of screenHeight to boardHeight.
-            //    - If there's no rotation or severe distortion, this is fine.
-            //    - If you do rotate the board, you'd need more advanced handling.
-            double boardHeight = element.size.height;
-            double fontScale =
-                (boardHeight == 0) ? 1 : (boxHeight / boardHeight);
-            if (fontScale.isNaN || fontScale.isInfinite) {
-              fontScale = 1; // fallback if something weird
-            }
-            final double finalFontSize = element.fontSize * fontScale;
-
-            return Positioned(
-              left: boxLeft,
-              top: boxTop,
-              // Use the scaled size in screen coordinates
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-
-                // Select text if user long-presses
-                onLongPress: () {
-                  setState(() {
-                    _selectedTextElement = element;
-                    _currentTool = ToolMode.text;
-                  });
-                },
-
-                // Drag the text in board space
-                onPanUpdate: (details) {
-                  setState(() {
-                    final inverseMatrix =
-                        Matrix4.inverted(_transformationMatrix);
-                    final deltaVec = inverseMatrix.transform3(
-                      vm.Vector3(details.delta.dx, details.delta.dy, 0),
-                    );
-                    element.position += Offset(deltaVec.x, deltaVec.y);
-                  });
-                },
-
-                child: Container(
-                  width: boxWidth,
-                  height: boxHeight,
-                  decoration: BoxDecoration(
-                    border: (_selectedTextElement == element)
-                        ? Border.all(color: Colors.blue, width: 1)
-                        : null,
-                  ),
-                  child: Stack(
-                    children: [
-                      // Editing vs. displayed text
-                      if (element.isEditing)
-                        TextField(
-                          autofocus: true,
-                          style: TextStyle(fontSize: finalFontSize),
-                          onChanged: (value) => element.text = value,
-                          onSubmitted: (value) {
-                            setState(() => element.isEditing = false);
-                          },
-                        )
-                      else
-                        Text(
-                          element.text,
-                          style: TextStyle(fontSize: finalFontSize),
-                        ),
-
-                      // Resize handle if this is the selected text
-                      if (_selectedTextElement == element)
-                        Positioned(
-                          right:
-                              -10, // handle sits partly outside to appear as a corner
-                          bottom: -10,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onPanUpdate: (details) {
-                              setState(() {
-                                final inverseMatrix =
-                                    Matrix4.inverted(_transformationMatrix);
-                                final deltaVec = inverseMatrix.transform3(
-                                  vm.Vector3(
-                                      details.delta.dx, details.delta.dy, 0),
-                                );
-                                // The new size in board coords:
-                                double newW = element.size.width + deltaVec.x;
-                                double newH = element.size.height + deltaVec.y;
-
-                                // Clamp to avoid going negative
-                                if (newW < 20) newW = 20;
-                                if (newH < 20) newH = 20;
-
-                                element.size = Size(newW, newH);
-                                // If you want the "base" font size to track the new height:
-                                element.fontSize = element.size.height * 1.2;
-                              });
-                            },
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: Colors.blue,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
         ],
       ),
     );
@@ -993,6 +1246,16 @@ class _MathNotesState extends State<MathNotes> {
         'x': transformedPoint.dx,
         'y': transformedPoint.dy,
       });
+    }
+    if (_currentTool == ToolMode.shape) {
+      final transformedPoint = _transformPoint(details.focalPoint);
+      _currentShape = ShapeShape(
+        type: _currentShapeType,
+        startPoint: transformedPoint,
+        endPoint: transformedPoint, // Initialize both points to same position
+        color: _currentColor,
+        strokeWidth: _strokeWidth,
+      );
     }
   }
 
@@ -1039,6 +1302,12 @@ class _MathNotesState extends State<MathNotes> {
       setState(() {});
       _autoSave();
     }
+    if (_currentTool == ToolMode.shape && _currentShape != null) {
+      final transformedPoint = _transformPoint(details.focalPoint);
+      setState(() {
+        _currentShape!.endPoint = transformedPoint;
+      });
+    }
   }
 
   void _handleScaleEnd(ScaleEndDetails details) {
@@ -1054,6 +1323,13 @@ class _MathNotesState extends State<MathNotes> {
       );
       _currentCommands = null;
       _currentPath = null;
+      _autoSave();
+    }
+    if (_currentShape != null) {
+      setState(() {
+        _shapes.add(_currentShape!);
+        _currentShape = null;
+      });
       _autoSave();
     }
   }
@@ -1128,9 +1404,22 @@ class _MathNotesState extends State<MathNotes> {
   }
 
   void _undo() {
+    // First try undoing paths
     if (_paths.isNotEmpty) {
       setState(() {
         _redoStack.add(_paths.removeLast());
+      });
+      _autoSave();
+    }
+    // If no paths left, try undoing shapes
+    else if (_shapes.isNotEmpty) {
+      setState(() {
+        _redoStack.add(_shapes.removeLast());
+      });
+      _autoSave();
+    } else if (_textElements.isNotEmpty) {
+      setState(() {
+        _redoStack.add(_textElements.removeLast());
       });
       _autoSave();
     }
@@ -1139,7 +1428,12 @@ class _MathNotesState extends State<MathNotes> {
   void _redo() {
     if (_redoStack.isNotEmpty) {
       setState(() {
-        _paths.add(_redoStack.removeLast());
+        final item = _redoStack.removeLast();
+        if (item is DrawingPath) {
+          _paths.add(item);
+        } else if (item is ShapeShape) {
+          _shapes.add(item);
+        }
       });
       _autoSave();
     }
@@ -1165,3 +1459,5 @@ class _MathNotesState extends State<MathNotes> {
 enum ToolMode { hand, pen, text, shape, ai }
 
 enum DrawingTool { pen, marker, eraser }
+
+enum ShapeType { circle, square, triangle, hexagon }

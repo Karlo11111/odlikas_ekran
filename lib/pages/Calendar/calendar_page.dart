@@ -129,27 +129,13 @@ class _CalendarPageState extends State<CalendarPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initFromHive();
-      _fetchHolidays();
-    });
-  }
-
-  Future<void> _fetchHolidays() async {
-    QuerySnapshot snapshot =
-        await FirebaseFirestore.instance.collection('SchoolHolidays').get();
-
-    setState(() {
-      _holidays = snapshot.docs.map((doc) {
-        return {
-          'name': doc['name'],
-          'startDate': (doc['startDate'] as Timestamp).toDate(),
-          'endDate': (doc['endDate'] as Timestamp).toDate(),
-        };
-      }).toList();
     });
   }
 
   bool _isHoliday(DateTime date) {
-    for (var holiday in _holidays) {
+    final holidays = context.watch<TestViewmodel>().holidays;
+
+    for (var holiday in holidays) {
       DateTime startDate = holiday['startDate'];
       DateTime endDate = holiday['endDate'];
 
@@ -290,6 +276,7 @@ class _CalendarPageState extends State<CalendarPage> {
     if (viewModel.tests == null && !viewModel.isLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         viewModel.fetchTests(_email!, _password!);
+        viewModel.fetchHolidays();
       });
     }
 
@@ -325,7 +312,7 @@ class _CalendarPageState extends State<CalendarPage> {
                       if (details.primaryVelocity! > 0) {
                         _goToPreviousMonth(); // swipe desno
                       } else if (details.primaryVelocity! < 0) {
-                        _goToNextMonth(); // swipe livo
+                        _goToNextMonth(); // swipe lijevo
                       }
                     }
                   },
@@ -340,7 +327,7 @@ class _CalendarPageState extends State<CalendarPage> {
                                 // RETURN BUTTON
                                 SizedBox(
                                     width: MediaQuery.of(context).size.width *
-                                        0.035),
+                                        0.039),
                                 IconButton(
                                   icon: const Icon(Icons.arrow_back),
                                   iconSize: 50,
@@ -503,9 +490,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     ],
                   ),
                 )
-              : const Center(
-                  child: Text("No data available"),
-                ),
+              : const Center(),
     );
   }
 
@@ -545,28 +530,14 @@ class _CalendarPageState extends State<CalendarPage> {
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setDialogState) {
             return FutureBuilder<List<Map<String, String>>>(
               future: _fetchEvents(date),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(
-                    child: Lottie.asset(
-                      'assets/animations/bird_animation.json',
-                      width: 150,
-                      height: 150,
-                      fit: BoxFit.contain,
-                    ),
-                  );
+                  return const Center();
                 } else if (snapshot.hasError) {
-                  return Center(
-                    child: Lottie.asset(
-                      'assets/animations/bird_animation.json',
-                      width: 150,
-                      height: 150,
-                      fit: BoxFit.contain,
-                    ),
-                  );
+                  return const Center();
                 } else {
                   events = snapshot.data ?? [];
 
@@ -581,33 +552,33 @@ class _CalendarPageState extends State<CalendarPage> {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         width: MediaQuery.of(context).size.width * 0.56,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // ime mjeseca header
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12, horizontal: 20),
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                    bottom: BorderSide(
-                                        color:
-                                            Color.fromRGBO(113, 113, 113, 0.2),
-                                        width: 1)),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Monthly header
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12, horizontal: 20),
+                                decoration: const BoxDecoration(
+                                  border: Border(
+                                      bottom: BorderSide(
+                                          color: Color.fromRGBO(
+                                              113, 113, 113, 0.2),
+                                          width: 1)),
+                                ),
+                                child: Text(
+                                  _monthNames[date.month - 1].toUpperCase(),
+                                  style: GoogleFonts.inter(
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black),
+                                ),
                               ),
-                              child: Text(
-                                _monthNames[date.month - 1].toUpperCase(),
-                                style: GoogleFonts.inter(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.black),
-                              ),
-                            ),
 
-                            // testovi i ostali dogadaji
-                            Expanded(
-                              child: SingleChildScrollView(
+                              // Tests and events section
+                              SingleChildScrollView(
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
                                       vertical: 24, horizontal: 16),
@@ -651,6 +622,64 @@ class _CalendarPageState extends State<CalendarPage> {
                                               ],
                                             );
                                           }),
+                                          ...context
+                                              .watch<TestViewmodel>()
+                                              .holidays
+                                              .where((holiday) {
+                                            DateTime startDate =
+                                                holiday['startDate'];
+                                            DateTime endDate =
+                                                holiday['endDate'];
+
+                                            // Normalize dates to remove the time component
+                                            DateTime normalizedDate = DateTime(
+                                                date.year,
+                                                date.month,
+                                                date.day);
+                                            DateTime normalizedStartDate =
+                                                DateTime(
+                                                    startDate.year,
+                                                    startDate.month,
+                                                    startDate.day);
+                                            DateTime normalizedEndDate =
+                                                DateTime(endDate.year,
+                                                    endDate.month, endDate.day);
+
+                                            // Check if the normalized date is within the range (inclusive)
+                                            return (normalizedDate
+                                                        .isAtSameMomentAs(
+                                                            normalizedStartDate) ||
+                                                    normalizedDate
+                                                        .isAtSameMomentAs(
+                                                            normalizedEndDate)) ||
+                                                (normalizedDate.isAfter(
+                                                        normalizedStartDate) &&
+                                                    normalizedDate.isBefore(
+                                                        normalizedEndDate));
+                                          }).map((holiday) {
+                                            return Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  holiday['name']!,
+                                                  style: GoogleFonts.inter(
+                                                      fontSize: 24,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: Colors.black),
+                                                ),
+                                                Text(
+                                                  "Praznik",
+                                                  style: GoogleFonts.inter(
+                                                      fontSize: 20,
+                                                      fontWeight:
+                                                          FontWeight.w400,
+                                                      color: Colors.black),
+                                                ),
+                                              ],
+                                            );
+                                          }),
                                           ...events.map((event) {
                                             return Column(
                                               crossAxisAlignment:
@@ -681,189 +710,206 @@ class _CalendarPageState extends State<CalendarPage> {
                                   ),
                                 ),
                               ),
-                            ),
 
-                            // dodaj dogadaj u kalendar sekcija
-                            Column(
-                              children: [
-                                GestureDetector(
-                                  onTap: () => setState(
-                                      () => isAddingEvent = !isAddingEvent),
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 12, horizontal: 16),
-                                    decoration: const BoxDecoration(
-                                      border: Border(
-                                          top: BorderSide(
-                                              color: Color.fromRGBO(
-                                                  113, 113, 113, 0.2),
-                                              width: 1)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                            isAddingEvent
-                                                ? Icons.remove
-                                                : Icons.add,
-                                            color: Colors.grey,
-                                            size: 34),
-                                        const SizedBox(width: 30),
-                                        Text(
-                                          "Dodaj događaj u kalendar",
-                                          style: GoogleFonts.inter(
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.normal,
-                                              color: Colors.grey),
-                                        ),
-                                      ],
+                              // Add event section
+                              Column(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      setDialogState(() {
+                                        isAddingEvent = !isAddingEvent;
+                                      });
+                                    },
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12, horizontal: 16),
+                                      decoration: const BoxDecoration(
+                                        border: Border(
+                                            top: BorderSide(
+                                                color: Color.fromRGBO(
+                                                    113, 113, 113, 0.2),
+                                                width: 1)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const SizedBox(width: 15),
+                                          Icon(
+                                              isAddingEvent
+                                                  ? Icons.remove
+                                                  : Icons.add,
+                                              color: Colors.grey,
+                                              size: 34),
+                                          const SizedBox(width: 30),
+                                          Text(
+                                            "Dodaj događaj u kalendar",
+                                            style: GoogleFonts.inter(
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.normal,
+                                                color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
 
-                                // Expandable Event Input Fields
-                                if (isAddingEvent)
-                                  Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const SizedBox(width: 20),
-                                        // polja za upis opisa i naslova
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
+                                  // Expandable Event Input Fields
+                                  // Use ternary operator for visibility instead of AnimatedSize
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    height: isAddingEvent ? null : 0,
+                                    curve: Curves.easeInOut,
+                                    child: Container(
+                                      padding: EdgeInsets.all(
+                                          isAddingEvent ? 16.0 : 0),
+                                      child: Visibility(
+                                        visible: isAddingEvent,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
-                                            // naslov sekcija
-                                            const SizedBox(height: 8),
-                                            SizedBox(
-                                              width: MediaQuery.of(context)
-                                                      .size
-                                                      .width *
-                                                  0.4,
-                                              child: TextField(
-                                                controller: titleController,
-                                                style: GoogleFonts.inter(
-                                                    fontSize: 20),
-                                                decoration: InputDecoration(
-                                                  hintText: "Naslov",
-                                                  hintStyle: GoogleFonts.inter(
-                                                      color:
-                                                          const Color.fromRGBO(
-                                                              113,
-                                                              113,
-                                                              113,
-                                                              1)),
-                                                  contentPadding:
-                                                      const EdgeInsets
-                                                          .symmetric(
-                                                          vertical: 8,
-                                                          horizontal: 12),
-                                                  border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                    borderSide:
-                                                        const BorderSide(
-                                                            color: Colors.grey),
+                                            const SizedBox(width: 20),
+                                            // Fields for title and description
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
+                                              children: [
+                                                // Title section
+                                                const SizedBox(height: 8),
+                                                SizedBox(
+                                                  width: MediaQuery.of(context)
+                                                          .size
+                                                          .width *
+                                                      0.4,
+                                                  child: TextField(
+                                                    controller: titleController,
+                                                    style: GoogleFonts.inter(
+                                                        fontSize: 20),
+                                                    decoration: InputDecoration(
+                                                      hintText: "Naslov",
+                                                      hintStyle:
+                                                          GoogleFonts.inter(
+                                                              color: const Color
+                                                                  .fromRGBO(113,
+                                                                  113, 113, 1)),
+                                                      contentPadding:
+                                                          const EdgeInsets
+                                                              .symmetric(
+                                                              vertical: 8,
+                                                              horizontal: 12),
+                                                      border:
+                                                          OutlineInputBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(8),
+                                                        borderSide:
+                                                            const BorderSide(
+                                                                color: Colors
+                                                                    .grey),
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 20),
+                                                const SizedBox(height: 20),
 
-                                            //  opis sekcija
-                                            SizedBox(
-                                              width: MediaQuery.of(context)
-                                                      .size
-                                                      .width *
-                                                  0.4,
-                                              child: TextField(
-                                                maxLines: 3,
-                                                controller:
-                                                    descriptionController,
-                                                style: GoogleFonts.inter(
-                                                    fontSize: 20),
-                                                maxLength: 30,
-                                                decoration: InputDecoration(
-                                                  hintText:
-                                                      "Opis (maksimalno 30 slova)",
-                                                  hintStyle: GoogleFonts.inter(
-                                                      color:
-                                                          const Color.fromRGBO(
-                                                              113,
-                                                              113,
-                                                              113,
-                                                              1)),
-                                                  contentPadding:
-                                                      const EdgeInsets
-                                                          .symmetric(
-                                                          vertical: 8,
-                                                          horizontal: 12),
-                                                  border: OutlineInputBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8),
-                                                    borderSide:
-                                                        const BorderSide(
-                                                            color: Colors.grey),
+                                                // Description section
+                                                SizedBox(
+                                                  width: MediaQuery.of(context)
+                                                          .size
+                                                          .width *
+                                                      0.4,
+                                                  child: TextField(
+                                                    maxLines: 3,
+                                                    controller:
+                                                        descriptionController,
+                                                    style: GoogleFonts.inter(
+                                                        fontSize: 20),
+                                                    maxLength: 30,
+                                                    decoration: InputDecoration(
+                                                      hintText:
+                                                          "Opis (maksimalno 30 slova)",
+                                                      hintStyle:
+                                                          GoogleFonts.inter(
+                                                              color: const Color
+                                                                  .fromRGBO(113,
+                                                                  113, 113, 1)),
+                                                      contentPadding:
+                                                          const EdgeInsets
+                                                              .symmetric(
+                                                              vertical: 8,
+                                                              horizontal: 12),
+                                                      border:
+                                                          OutlineInputBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(8),
+                                                        borderSide:
+                                                            const BorderSide(
+                                                                color: Colors
+                                                                    .grey),
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
+                                              ],
+                                            ),
+                                            const SizedBox(width: 20),
+                                            // Buttons
+                                            Column(
+                                              children: [
+                                                const SizedBox(height: 20),
+                                                IconButton(
+                                                  icon: const Icon(Icons.cancel,
+                                                      size: 55),
+                                                  color: Colors.red,
+                                                  onPressed: () =>
+                                                      setDialogState(() =>
+                                                          isAddingEvent =
+                                                              false),
+                                                ),
+                                                const SizedBox(width: 10),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                      Icons.check_circle,
+                                                      size: 55),
+                                                  color: Colors.blue,
+                                                  onPressed: () async {
+                                                    setDialogState(() =>
+                                                        isAddingEvent = false);
+                                                    // 1. Get data from controllers
+                                                    final enteredTitle =
+                                                        titleController.text
+                                                            .trim();
+                                                    final enteredDescription =
+                                                        descriptionController
+                                                            .text
+                                                            .trim();
+                                                    // Date
+                                                    final selectedDate = date;
+
+                                                    // 2. Save to Firestore
+                                                    await saveEvent(
+                                                      title: enteredTitle,
+                                                      description:
+                                                          enteredDescription,
+                                                      date: selectedDate,
+                                                    );
+                                                    if (context.mounted) {
+                                                      Navigator.pop(context);
+                                                    }
+                                                  },
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(width: 20),
-                                        // Buttons
-                                        Column(
-                                          children: [
-                                            const SizedBox(height: 20),
-                                            IconButton(
-                                              icon: const Icon(Icons.cancel,
-                                                  size: 50),
-                                              color: Colors.red,
-                                              onPressed: () => setState(
-                                                  () => isAddingEvent = false),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            IconButton(
-                                              icon: const Icon(
-                                                  Icons.check_circle,
-                                                  size: 50),
-                                              color: Colors.blue,
-                                              onPressed: () async {
-                                                setState(() =>
-                                                    isAddingEvent = false);
-                                                // 1. data iz kontrolera
-                                                final enteredTitle =
-                                                    titleController.text.trim();
-                                                final enteredDescription =
-                                                    descriptionController.text
-                                                        .trim();
-                                                // datum
-                                                final selectedDate = date;
-
-                                                // 2. spremi u firestore
-                                                await saveEvent(
-                                                  title: enteredTitle,
-                                                  description:
-                                                      enteredDescription,
-                                                  date: selectedDate,
-                                                );
-                                                if (mounted) {
-                                                  Navigator.pop(context);
-                                                }
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                      ),
                                     ),
                                   ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

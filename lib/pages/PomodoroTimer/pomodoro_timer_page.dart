@@ -35,23 +35,50 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
   // trebamo samo email jer ne fetchamo nikakve podatke s ednebvnik api - samo trebamo email uvatiti iz fierbasea jer se tako zove doc u firebaseu
   String? _email;
 
+  // polja i metode za timer firestora
+  String _currentPhase = 'Pomodoro';
+  bool _isRunning = false;
+  int _cycleCount = 0;
+  int _initialDuration = 25 * 60; // sekunde
+  Timestamp? _startTimestamp;
+
+  // ovo je vrijeme koje se prikazuje korisniku, lokalno
+  final int _displayedSecondsLeft = 25 * 60;
+  Timer? _localTimer;
+
+  late ValueNotifier<int> _secondsNotifier;
+
+  int get displayedSecondsLeft => _secondsNotifier.value;
+
+  @override
+  void initState() {
+    super.initState();
+    _secondsNotifier = ValueNotifier<int>(0); // Or some other safe default
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initFromHive();
+    });
+  }
+
   Future<void> _initFromHive() async {
     try {
       final box = await Hive.openBox('user_credentials');
       final storedEmail = box.get('email') as String?;
 
+      // If there’s no email in Hive, maybe exit or handle differently
       if (storedEmail == null) {
         Navigator.of(context).pop();
         return;
       }
 
+      // Retrieve additional prefs
       final prefs = await SharedPreferences.getInstance();
       final screenId = prefs.getString('screenId');
 
       if (screenId != null) {
         final prefsDoc = await FirebaseFirestore.instance
-            .collection('CreatedScreens')
-            .doc(screenId)
+            .collection('studentProfiles')
+            .doc(storedEmail)
             .get();
 
         if (prefsDoc.exists) {
@@ -65,21 +92,23 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
         }
       }
 
-      // Initialize service AFTER getting preferences
+      // Now initialize the service
       setState(() {
         pomodoroService = FirestorePomodoroService(
           _email!,
           _daysLearning,
           _hoursLearning,
         );
+        pomodoroService.initializeTimer();
+        _listenToPomodoroChanges();
+
+        // We are done loading!
+        _isLoading = false;
         _isInitialized = true;
       });
-
-      pomodoroService.initializeTimer();
-      _listenToPomodoroChanges();
-      _isLoading = false;
     } catch (e) {
       debugPrint('Initialization error: $e');
+      // Handle or set _isLoading = false with error UI, etc.
     }
   }
 
@@ -114,31 +143,6 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
           _stopLocalTicker();
         }
       }
-    });
-  }
-
-  // polja i metode za timer firestora
-  String _currentPhase = 'Pomodoro';
-  bool _isRunning = false;
-  int _cycleCount = 0;
-  int _initialDuration = 25 * 60; // sekunde
-  Timestamp? _startTimestamp;
-
-  // ovo je vrijeme koje se prikazuje korisniku, lokalno
-  final int _displayedSecondsLeft = 25 * 60;
-  Timer? _localTimer;
-
-  late ValueNotifier<int> _secondsNotifier;
-
-  int get displayedSecondsLeft => _secondsNotifier.value;
-
-  @override
-  void initState() {
-    super.initState();
-    _secondsNotifier = ValueNotifier<int>(_displayedSecondsLeft);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initFromHive(); // loadaj email/password iz Hivea
     });
   }
 
@@ -396,7 +400,7 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
               _buildStatItem('⏳ Dnevni cilj', '$_hoursLearning sati/dan'),
               const SizedBox(height: 15),
               _buildStatItem(
-                  '✅ Održane sesije', '$_streakCount sesija ovaj tjedan'),
+                  '✅ Održane sesije', '$_weeklySessions sesija ovaj tjedan'),
               const Spacer(),
               LinearProgressIndicator(
                 value: progress.toDouble(),

@@ -30,6 +30,9 @@ class WhiteboardData extends HiveObject {
   @HiveField(7, defaultValue: [])
   List<Map<String, dynamic>> textElements = [];
 
+  @HiveField(8, defaultValue: [])
+  List<Map<String, dynamic>> shapes = [];
+
   WhiteboardData({
     required this.id,
     required this.name,
@@ -39,6 +42,7 @@ class WhiteboardData extends HiveObject {
     required this.currentScale,
     Uint8List? screenshot,
     this.textElements = const [],
+    this.shapes = const [],
   });
 
   WhiteboardData copyWith({
@@ -50,6 +54,7 @@ class WhiteboardData extends HiveObject {
     double? currentScale,
     Uint8List? screenshot,
     List<Map<String, dynamic>>? textElements,
+    List<Map<String, dynamic>>? shapes,
   }) {
     return WhiteboardData(
       id: id ?? this.id,
@@ -60,6 +65,7 @@ class WhiteboardData extends HiveObject {
       currentScale: currentScale ?? this.currentScale,
       screenshot: screenshot ?? this.screenshot,
       textElements: textElements ?? this.textElements,
+      shapes: shapes ?? this.shapes,
     );
   }
 }

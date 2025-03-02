@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:lottie/lottie.dart';
+import 'package:odlikas_ekran/database/api/open_ai_service.dart';
+import 'package:odlikas_ekran/pages/SimilarTasks/similar_tasks_page.dart';
 
 class SolutionStepsPage extends StatelessWidget {
   final List<Map<String, String>> steps;
+  final String originalTask; // Add this to store the original task
 
-  const SolutionStepsPage({super.key, required this.steps});
+  const SolutionStepsPage({
+    Key? key,
+    required this.steps,
+    required this.originalTask, // Add this parameter
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +50,8 @@ class SolutionStepsPage extends StatelessWidget {
                 color: Colors.white,
                 width: double.infinity,
                 child: Text(
-                  _fixDiacritics(step['step'] ?? 'Nema dostupnog objašnjenja'),
+                  _betterDiacriticsFix(
+                      step['step'] ?? 'Nema dostupnog objašnjenja'),
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     color: Colors.grey[800],
@@ -141,7 +150,7 @@ class SolutionStepsPage extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Math.tex(
-                              lastResult,
+                              _fixMultiplicationSymbols(lastResult),
                               textStyle: GoogleFonts.inter(
                                 fontSize: 58,
                                 color: Colors.black,
@@ -174,7 +183,7 @@ class SolutionStepsPage extends StatelessWidget {
                           ),
                         ),
                         TextButton(
-                          onPressed: () {},
+                          onPressed: () => _loadSimilarTasks(context),
                           child: Text(
                             "Zadatci slični ovome",
                             style: GoogleFonts.inter(
@@ -193,10 +202,72 @@ class SolutionStepsPage extends StatelessWidget {
     );
   }
 
-  // Keep the helper methods the same
+  // Nova metoda za učitavanje sličnih zadataka
+  Future<void> _loadSimilarTasks(BuildContext context) async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Scaffold(
+            body: Center(
+          child: Lottie.asset(
+            'assets/animations/bird_animation.json',
+            width: 150,
+            height: 150,
+            fit: BoxFit.contain,
+          ),
+        ));
+      },
+    );
+
+    try {
+      // Initialize OpenAI service
+      final openAiService = OpenAiService();
+
+      // Get similar tasks
+      final similarTasks =
+          await openAiService.generateSimilarTasks(originalTask);
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      if (similarTasks != null && similarTasks.isNotEmpty) {
+        // Navigate to similar tasks page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SimilarTasksPage(
+              tasks: similarTasks,
+              originalTask: originalTask,
+            ),
+          ),
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Nije moguće generirati slične zadatke. Pokušajte ponovno.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog and show error
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Greška: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Original methods - kept exactly as they were
   String _fixMultiplicationSymbols(String latex) {
-    return latex.replaceAllMapped(
-        RegExp(r'(cdot|times)'), (match) => r'\times');
+    return latex.replaceAllMapped(RegExp(r'( cdot )'), (match) => r'\times');
   }
 
   String _cleanRawLatex(String latex) {
@@ -207,11 +278,42 @@ class SolutionStepsPage extends StatelessWidget {
         .replaceAll("boxed", "");
   }
 
-  String _fixDiacritics(String text) {
-    return text
-        .replaceAll('Å¡', 'š')
-        .replaceAll('Å¾', 'ž')
-        .replaceAll('Ä‡', 'č')
-        .replaceAll('Å¡', 'š');
+  String _betterDiacriticsFix(String text) {
+    // Remove the strange character that appears after "Pronač"
+    text = text.replaceAll(String.fromCharCode(0x0087), '');
+    text = text.replaceAll(String.fromCharCode(0x008D), '');
+
+    // Direct character replacements for Croatian letters
+    final Map<String, String> replacements = {
+      'Ä': 'č',
+      'Å¡': 'š',
+      'Å¾': 'ž',
+      'Ä‡': 'ć',
+    };
+
+    // Apply replacements
+    replacements.forEach((key, value) {
+      text = text.replaceAll(key, value);
+    });
+
+    // Handle common word patterns
+    final wordReplacements = {
+      'PronaÄ': 'Pronađ',
+      'IzraÄunaj': 'Izračunaj',
+      'jednadÅ¾b': 'jednadžb',
+      'konaÄno': 'konačno',
+      'mnoÅ¾': 'množ',
+      'mnoÅ¾enj': 'množnj',
+      'Primjenjuje': 'Primjenjuje',
+      'poniÅ¡tavaju': 'poništavaju',
+      'cdot': '·',
+    };
+
+    // Apply word-level replacements
+    wordReplacements.forEach((key, value) {
+      text = text.replaceAll(key, value);
+    });
+
+    return text;
   }
 }

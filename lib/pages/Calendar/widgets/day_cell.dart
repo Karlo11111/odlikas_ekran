@@ -7,15 +7,21 @@ class DayCell extends StatelessWidget {
   final bool isHoliday, isTest;
   final VoidCallback? onTap;
 
-  const DayCell(
-      {required this.date,
-      required this.isWithinCurrentMonth,
-      required this.isTest,
-      required this.onTap,
-      required this.isHoliday});
+  const DayCell({
+    required this.date,
+    required this.isWithinCurrentMonth,
+    required this.isTest,
+    required this.onTap,
+    required this.isHoliday,
+  });
 
   @override
   Widget build(BuildContext context) {
+    DateTime today = DateTime.now();
+    bool isToday = today.year == date.year &&
+        today.month == date.month &&
+        today.day == date.day;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -29,9 +35,15 @@ class DayCell extends StatelessWidget {
                   ? const Color.fromRGBO(23, 148, 210, 1)
                   : Colors.white),
           border: Border.all(
-              color: isHoliday || isTest
-                  ? Colors.white
-                  : Color.fromRGBO(113, 113, 113, 0.2)),
+            color: isToday
+                ? Colors.black // Highlight today's date with a black border
+                : (isHoliday || isTest
+                    ? Colors.white
+                    : Color.fromRGBO(113, 113, 113, 0.2)),
+            width:
+                isToday ? 2.5 : 1, // Make today's border thicker for emphasis
+          ),
+          borderRadius: BorderRadius.circular(5), // Optional: round the corners
         ),
         child: Padding(
           padding: const EdgeInsets.all(8.0),
