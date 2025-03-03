@@ -54,6 +54,7 @@ class _CalendarPageState extends State<CalendarPage> {
   String? _email;
   String? _password;
 
+  // funckija koja dohvaca ocjene i email / password od ucenika
   Future<void> _fetchCredentialsAndGrades() async {
     final prefs = await SharedPreferences.getInstance();
     final screenId = prefs.getString('screenId');
@@ -74,18 +75,18 @@ class _CalendarPageState extends State<CalendarPage> {
         final fetchedPassword = doc.get('password') as String?;
 
         if (fetchedEmail != null && fetchedPassword != null) {
-          // Update local state
+          // azuriraj lokalno stanje
           setState(() {
             _email = fetchedEmail;
             _password = fetchedPassword;
           });
 
-          // Save to Hive for next time
+          // spremi u hive za drugi put
           final box = await Hive.openBox('user_credentials');
           await box.put('email', fetchedEmail);
           await box.put('password', fetchedPassword);
 
-          // Now fetch the grades
+          // i sad dohvati ocjene
           _fetchGradesFromViewModel(fetchedEmail, fetchedPassword);
         }
       }
@@ -94,6 +95,7 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  // dohvati ocjene i student profile 
   void _fetchGradesFromViewModel(String email, String password) {
     final viewModel = context.read<HomePageViewModel>();
     viewModel.fetchGrades(email, password);
@@ -101,15 +103,15 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _initFromHive() async {
-    // 1) Open (or create) your Hive box
+    // otvori hive box
     final box = await Hive.openBox('user_credentials');
 
-    // 2) Attempt to read stored credentials
+    // probaj procitat email i password iz hivea
     final storedEmail = box.get('email') as String?;
     final storedPassword = box.get('password') as String?;
 
     if (storedEmail != null && storedPassword != null) {
-      // We have them locally, so set state and fetch the grades
+      // imamo ih lokalno, postavi ih u state
       setState(() {
         _email = storedEmail;
         _password = storedPassword;
@@ -117,9 +119,9 @@ class _CalendarPageState extends State<CalendarPage> {
 
       _fetchGradesFromViewModel(storedEmail, storedPassword);
     } else {
-      // No credentials in Hive, fall back to Firebase
+      // nema nicega u hiveu, fetechaj iz firebasea
       debugPrint('No credentials found in Hive. Fetching from Firebase...');
-      await _fetchCredentialsAndGrades(); // the Firebase version
+      await _fetchCredentialsAndGrades(); // Firebase verzija
     }
   }
 
@@ -132,6 +134,7 @@ class _CalendarPageState extends State<CalendarPage> {
     });
   }
 
+  //funkcija koja provjerava jeli neki dan praznik
   bool _isHoliday(DateTime date) {
     final holidays = context.watch<TestViewmodel>().holidays;
 
@@ -139,14 +142,13 @@ class _CalendarPageState extends State<CalendarPage> {
       DateTime startDate = holiday['startDate'];
       DateTime endDate = holiday['endDate'];
 
-      // Normalize dates to remove the time component
+      // normaliziraj datume
       DateTime normalizedDate = DateTime(date.year, date.month, date.day);
       DateTime normalizedStartDate =
           DateTime(startDate.year, startDate.month, startDate.day);
       DateTime normalizedEndDate =
           DateTime(endDate.year, endDate.month, endDate.day);
 
-      // Check if the normalized date is within the range (inclusive)
       if ((normalizedDate.isAtSameMomentAs(normalizedStartDate) ||
               normalizedDate.isAtSameMomentAs(normalizedEndDate)) ||
           (normalizedDate.isAfter(normalizedStartDate) &&
@@ -176,13 +178,12 @@ class _CalendarPageState extends State<CalendarPage> {
     });
   }
 
-  // SAVE EVENTS IN FIREBASE
+  // SPREMI EVENTS U FIREBASE
   Future<void> saveEvent({
     required String title,
     required String description,
     required DateTime date,
   }) async {
-    // Make sure _email is not null before saving
     if (_email == null) {
       debugPrint('No email found. Cannot save event.');
       return;
@@ -206,6 +207,7 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  // funkcija koja dohvaca ucenikove evente
   Future<List<Map<String, String>>> _fetchEvents(DateTime date) async {
     if (_email == null) {
       debugPrint('No email found. Cannot fetch events.');

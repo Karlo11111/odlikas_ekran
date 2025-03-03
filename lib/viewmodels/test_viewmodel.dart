@@ -3,19 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:odlikas_ekran/database/api/api_service.dart';
 import 'package:odlikas_ekran/models/tests.dart';
 
+// viewmodel za testove
 class TestViewmodel extends ChangeNotifier {
+  // variabla za api service
   final ApiService _apiService;
 
   TestViewmodel(this._apiService);
 
+  // varijable za testove, praznike i loadanje
   bool _isLoading = false;
   Tests? _tests;
   List<Map<String, dynamic>> _holidays = [];
 
+  // getter funkcije
   Tests? get tests => _tests;
   bool get isLoading => _isLoading;
   List<Map<String, dynamic>> get holidays => _holidays;
 
+  // funkcija koja dohvaca testove iz api servica
   Future<void> fetchTests(String email, String password) async {
     _isLoading = true;
     notifyListeners();
@@ -31,6 +36,7 @@ class TestViewmodel extends ChangeNotifier {
     }
   }
 
+  // funkcija koja dohvaca praznike iz firebasea
   Future<void> fetchHolidays() async {
     try {
       QuerySnapshot snapshot =
@@ -44,7 +50,7 @@ class TestViewmodel extends ChangeNotifier {
         };
       }).toList();
 
-      notifyListeners(); // Notify UI about changes
+      notifyListeners(); 
     } catch (e) {
       print("Error fetching holidays: $e");
     }

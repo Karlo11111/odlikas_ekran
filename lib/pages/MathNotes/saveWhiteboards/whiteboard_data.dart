@@ -1,9 +1,9 @@
-// whiteboard_data.dart
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/adapters.dart';
 
 part 'whiteboard_data.g.dart';
 
+// klasa za cuvanje podataka whiteboarda
 @HiveType(typeId: 0)
 class WhiteboardData extends HiveObject {
   @HiveField(0)

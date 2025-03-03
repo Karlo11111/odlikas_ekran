@@ -20,29 +20,31 @@ import 'pages/QRCodePage/qr_code_page.dart';
 import 'package:hive_flutter/adapters.dart';
 
 void main() async {
+  // inicijalizacija firebasea
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // inicijalizacija hive-a (local storage)
   await Hive.initFlutter();
   Hive.registerAdapter(WhiteboardDataAdapter());
   await Hive.openBox<WhiteboardData>('whiteboards');
 
-  // Add this to refresh all objects on startup
+  // varijabla za znanstevene biljeske
   final whiteboardsBox = Hive.box<WhiteboardData>('whiteboards');
   whiteboardsBox.values.forEach((wb) {
     whiteboardsBox.get(wb.key);
   });
 
-  // Lock orientation to landscape mode
+  // vodoravna orijentacija na mobitelu
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
 
-  // Enable full-screen mode
+  // full-screen mode
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  // Check SharedPreferences for setup state
+  // provjeri shared preferences 
   final prefs = await SharedPreferences.getInstance();
   final setupDone = prefs.getBool('setupDone') ?? false;
   final String screenId = prefs.getString('screenId') ?? '';
@@ -73,17 +75,18 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Provide ApiService instance
+        // api service provider
         Provider<ApiService>(
           create: (_) => ApiService(
               "https://odlikas-e-dnevnik-api-d98502da5fd5.herokuapp.com"),
         ),
-        // Provide HomePageViewModel and connect it to ApiService
+        // konekcija homepage viewmodela s api sericom
         ChangeNotifierProxyProvider<ApiService, HomePageViewModel>(
           create: (context) => HomePageViewModel(context.read<ApiService>()),
           update: (_, apiService, previous) => HomePageViewModel(apiService),
         ),
 
+        // konekcija test viewmodela s api sericom
         ChangeNotifierProxyProvider<ApiService, TestViewmodel>(
           create: (context) => TestViewmodel(context.read<ApiService>()),
           update: (_, apiService, previous) => TestViewmodel(apiService),
@@ -91,6 +94,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
+        // rute za sve pageove
         routes: {
           '/': (context) => _decideFirstScreen(context),
           '/setup': (context) => const SetupScreen(),
@@ -106,6 +110,7 @@ class MyApp extends StatelessWidget {
     );
   }
 
+  // funkcija koja odabire prvi page koji ti se prikaze (ako si vec spojen onda odma homepage, ako si prosao prvi page onda odmna qr kod page)
   Widget _decideFirstScreen(BuildContext context) {
     if (!setupDone) {
       return const SetupScreen();

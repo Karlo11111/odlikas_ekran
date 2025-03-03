@@ -4,11 +4,14 @@ import 'package:odlikas_ekran/models/specific_subject.dart';
 import 'package:odlikas_ekran/models/student_profile.dart';
 import '../database/api/api_service.dart';
 
+//viewmodel za podatke ucenika
 class HomePageViewModel extends ChangeNotifier {
+  // variabla za api service
   final ApiService _apiService;
 
   HomePageViewModel(this._apiService);
 
+  // varijable za profil, ocjene i zakljucke ocjene
   bool _isLoading = false;
   StudentProfile? _studentProfile;
   Grades? _grades;
@@ -16,6 +19,7 @@ class HomePageViewModel extends ChangeNotifier {
   List<EvaluationElement>? _evaluationElements;
   String? _finalGrade;
 
+  // getter funckije
   bool get isLoading => _isLoading;
   StudentProfile? get studentProfile => _studentProfile;
   Grades? get grades => _grades;

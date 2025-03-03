@@ -20,16 +20,16 @@ class _QRCodePageState extends State<QRCodePage> {
 
   late String _screenId;
 
-  /// Datum i vrijeme kada QR kôd ističe
+  // Datum i vrijeme kada QR kôd ističe
   DateTime? _endTime;
 
-  /// Povremeni mjerač vremena za ažuriranje korisničkog sučelja svake sekunde.
+  // Povremeni mjerač vremena za ažuriranje korisničkog sučelja svake sekunde.
   Timer? _countdownTimer;
 
-  /// stream firestore dokumenata
+  // stream firestore dokumenata
   late Stream<DocumentSnapshot> _screenDocStream;
 
-  /// Jesmo li završili s učitavanjem prefs/endTime i pokrenuli mjerač vremena.
+  // Jesmo li završili s učitavanjem prefs/endTime i pokrenuli mjerač vremena.
   bool _isInitialized = false;
 
   @override
@@ -40,7 +40,7 @@ class _QRCodePageState extends State<QRCodePage> {
     _initializeScreenIdAndEndTime();
   }
 
-  /// Ova funkcija upravlja aync ucitavanjem screenId-a i endTime-a.
+  // Ova funkcija upravlja aync ucitavanjem screenId-a i endTime-a.
   Future<void> _initializeScreenIdAndEndTime() async {
     // ako nismo dobili id iz konstruktora, pokusaj ga ucitati iz prefs-a
     if (_screenId.isEmpty) {

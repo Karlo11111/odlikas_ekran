@@ -52,7 +52,7 @@ class _TodoListState extends State<TodoList> {
 
   @override
   Widget build(BuildContext context) {
-    // Get access to the test view model
+    // dobi test viewmodel
     final testViewModel = Provider.of<TestViewmodel>(context);
     return testViewModel.isLoading
         ? Scaffold(
@@ -76,7 +76,7 @@ class _TodoListState extends State<TodoList> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Back button
+                        // botun za povratak
                         Padding(
                           padding: const EdgeInsets.only(left: 8.0),
                           child: IconButton(
@@ -88,13 +88,13 @@ class _TodoListState extends State<TodoList> {
                             },
                           ),
                         ),
-                        // Title
+                        // naslov
                         Text(
                           "Popis obveza",
                           style: GoogleFonts.inter(
                               fontSize: 36, fontWeight: FontWeight.w800),
                         ),
-                        // Add button
+                        // dodaj button
                         Padding(
                           padding: const EdgeInsets.only(right: 8.0),
                           child: IconButton(
@@ -111,7 +111,7 @@ class _TodoListState extends State<TodoList> {
                   ),
                 ),
 
-                // Weekly tasks section
+                // tjedni taskovi
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -151,7 +151,7 @@ class _TodoListState extends State<TodoList> {
                   ),
                 ),
 
-                // Other tasks section
+                // ostali taskovi
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -191,7 +191,7 @@ class _TodoListState extends State<TodoList> {
                   ),
                 ),
 
-                // Recommendations section
+                // preporuke sekcija
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -216,6 +216,7 @@ class _TodoListState extends State<TodoList> {
           );
   }
 
+  // funkcija koja gradi weekly taskove
   Widget _buildWeeklyTasksTable() {
     final now = DateTime.now();
     final oneWeekLater = now.add(const Duration(days: 7));
@@ -333,6 +334,7 @@ class _TodoListState extends State<TodoList> {
     );
   }
 
+  // funkcija koja gradi ostale taskove
   Widget _buildOtherTasksTable() {
     final now = DateTime.now();
     final oneWeekLater = now.add(const Duration(days: 7));
@@ -449,8 +451,9 @@ class _TodoListState extends State<TodoList> {
     );
   }
 
+  // funkcija koja gradi preporuke taskove
   Widget _buildRecommendationsTable(Tests? tests) {
-    // Check if tests are loading or not available
+    // provjeri jel se testovi loadaju
     if (tests == null) {
       return const Center(
         child: CircularProgressIndicator(),
@@ -458,12 +461,12 @@ class _TodoListState extends State<TodoList> {
     }
     final testViewModel = Provider.of<TestViewmodel>(context);
 
-    // Handle loading state
+    // ako se test viewmodel jos loada
     if (testViewModel.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Handle empty state
+    // ako je prazan
     if (tests.testsByMonth.isEmpty) {
       return Container(
         decoration: BoxDecoration(
@@ -576,7 +579,7 @@ class _TodoListState extends State<TodoList> {
               ],
             ),
           ),
-          // Rest of recommendations in white rows
+          // ostale preporuke (bijeli redovi)
           if (recommendations.length > 1)
             Table(
               border: TableBorder(
@@ -584,7 +587,6 @@ class _TodoListState extends State<TodoList> {
                     BorderSide(color: Colors.grey.shade400, width: 1),
                 horizontalInside:
                     BorderSide(color: Colors.grey.shade400, width: 1),
-                // No top border as it would overlap with the header
                 bottom: BorderSide(color: Colors.grey.shade400, width: 0),
                 left: BorderSide(color: Colors.grey.shade400, width: 0),
                 right: BorderSide(color: Colors.grey.shade400, width: 0),

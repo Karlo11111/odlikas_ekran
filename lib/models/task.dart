@@ -1,3 +1,4 @@
+// klasa koja drzi model profila to-do taska
 class Task {
   String id;
   String title;
@@ -11,7 +12,7 @@ class Task {
     this.isCompleted = false,
   });
 
-  // Convert Task to Map for Firebase
+  // convertaj task u mapu
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -21,7 +22,7 @@ class Task {
     };
   }
 
-  // Create Task from Firebase document
+  // kreiraj task iz firebase dokumenta
   factory Task.fromMap(Map<String, dynamic> map) {
     return Task(
       id: map['id'],

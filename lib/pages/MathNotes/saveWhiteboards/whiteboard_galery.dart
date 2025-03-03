@@ -102,14 +102,12 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         if (index == 0) {
-                          // Special handling for the "Add New" card
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // White container with blue plus icon
                               AspectRatio(
                                 aspectRatio:
-                                    1.5, // Match the aspect ratio from the image
+                                    1.5, 
                                 child: GestureDetector(
                                   onTap: () => _createNewNote(context),
                                   child: Container(

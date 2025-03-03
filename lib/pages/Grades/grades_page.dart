@@ -20,6 +20,7 @@ class _GradesPageState extends State<GradesPage> {
   String? _email;
   String? _password;
 
+  // funkcija koja dohvaca ocjene i email / password iz firebasea
   Future<void> _fetchCredentialsAndGrades() async {
     final prefs = await SharedPreferences.getInstance();
     final screenId = prefs.getString('screenId');

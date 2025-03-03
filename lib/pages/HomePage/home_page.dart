@@ -22,7 +22,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
 
-    // Wait until after widget build to load from Hive
+    // cekaj do nakon sto se builda page da loadas iz hivea
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadCredentialsFromHive();
     });
@@ -53,6 +53,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // funckija koja dohvaca ocjene i email / password od ucenika iz firebasea
   Future<void> _fetchCredentialsFromFirebase() async {
     final prefs = await SharedPreferences.getInstance();
     final screenId = prefs.getString('screenId');

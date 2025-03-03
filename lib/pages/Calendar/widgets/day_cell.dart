@@ -36,14 +36,14 @@ class DayCell extends StatelessWidget {
                   : Colors.white),
           border: Border.all(
             color: isToday
-                ? Colors.black // Highlight today's date with a black border
+                ? Colors.black // danasnji dan highlightan s crnom bojom
                 : (isHoliday || isTest
                     ? Colors.white
                     : Color.fromRGBO(113, 113, 113, 0.2)),
             width:
-                isToday ? 2.5 : 1, // Make today's border thicker for emphasis
+                isToday ? 2.5 : 1, 
           ),
-          borderRadius: BorderRadius.circular(5), // Optional: round the corners
+          borderRadius: BorderRadius.circular(5), 
         ),
         child: Padding(
           padding: const EdgeInsets.all(8.0),

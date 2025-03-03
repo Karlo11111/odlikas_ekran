@@ -108,14 +108,13 @@ class _MathNotesState extends State<MathNotes> {
   TextElement? _selectedTextElement;
 
   //shapes drawing
-  // Add these class variables to your state class
   bool _showShapeOptions = false;
   ShapeType _currentShapeType = ShapeType.circle;
-  ShapeShape? _currentShape; // For tracking shape being drawn
+  ShapeShape? _currentShape; // koji shape je crtan
   // Add a list to store shapes
   List<ShapeShape> _shapes = [];
 
-  // this is for the ai mathpix image
+  // ovo je za ai mathpix image
   Uint8List? _capturedImage;
   String? _latexResult;
   bool _isOpenAiLoading = false;
@@ -136,9 +135,8 @@ class _MathNotesState extends State<MathNotes> {
     _whiteboardData = widget.whiteboardData!;
     _loadSavedState();
 
-    // Delay the first autosave to ensure rendering is complete
+    // delay prvi autosave dok se rendera app
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Wait for multiple frames to render
       await Future.delayed(const Duration(milliseconds: 500));
       if (mounted) {
         await _autoSave(force: true);

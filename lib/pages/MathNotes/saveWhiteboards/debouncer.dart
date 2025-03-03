@@ -8,11 +8,11 @@ class Debouncer {
   Debouncer({required this.delay});
 
   void run(VoidCallback action) {
-    _timer?.cancel(); // Cancel any previous timer
+    _timer?.cancel(); // prekini bilo koji prijasnji timer
     _timer = Timer(delay, action);
   }
 
-  // New cancel method
+  // nova cancel funkcij
   void cancel() {
     _timer?.cancel();
     _timer = null;

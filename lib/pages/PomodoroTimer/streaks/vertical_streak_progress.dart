@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:google_fonts/google_fonts.dart';
 
+// krugovi za steak u pomodoro timeru
 class VerticalProgressCircles extends StatelessWidget {
   final int daysLearning;
   final int hoursLearning;
@@ -44,7 +45,7 @@ class VerticalProgressCircles extends StatelessWidget {
               fill = 1.0;
             } else if (streakCount > start) {
               fill = (streakCount - start) / sessionsPerDay;
-              fill = fill.clamp(0.0, 1.0); // Ensure fill doesn't exceed 1.0
+              fill = fill.clamp(0.0, 1.0); 
             }
 
             return Padding(
@@ -102,9 +103,9 @@ class CircleProgressPainter extends CustomPainter {
       canvas.save();
       canvas.clipRect(Rect.fromLTRB(
         0,
-        0, // Start from top
+        0, // kreni od vrha
         size.width,
-        filledHeight, // Fill downwards
+        filledHeight, 
       ));
 
       // Draw the filled circle within the clipped area

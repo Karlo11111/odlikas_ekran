@@ -1,6 +1,8 @@
 import 'package:odlikas_ekran/models/tests.dart';
 
+// viewmodel za to-do list preporuke
 class RecommendationViewModel {
+  // funkcija koja dohvaca preporuke 
   List<Map<String, dynamic>> getRecommendations(Tests? tests) {
     if (tests == null) {
       return [];
@@ -9,13 +11,13 @@ class RecommendationViewModel {
     final now = DateTime.now();
     final recommendations = <Map<String, dynamic>>[];
 
-    // Collect all TestDetail objects from all months
+    // dohvacanje svih testova iz test viewmodela
     final allTestDetails = <TestDetail>[];
     tests.testsByMonth.forEach((month, testsInMonth) {
       allTestDetails.addAll(testsInMonth);
     });
 
-    // Process each TestDetail
+    // procesiraj svaki test
     for (final test in allTestDetails) {
       DateTime? testDate;
       try {
@@ -30,6 +32,7 @@ class RecommendationViewModel {
 
       final daysUntilTest = testDate.difference(now).inDays;
 
+      // ako je u sljedeca dva tjedna
       if (daysUntilTest <= 14 && daysUntilTest > 0) {
         recommendations.add({
           'title':

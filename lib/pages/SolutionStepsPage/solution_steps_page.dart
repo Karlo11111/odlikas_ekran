@@ -7,12 +7,12 @@ import 'package:odlikas_ekran/pages/SimilarTasks/similar_tasks_page.dart';
 
 class SolutionStepsPage extends StatelessWidget {
   final List<Map<String, String>> steps;
-  final String originalTask; // Add this to store the original task
+  final String originalTask; 
 
   const SolutionStepsPage({
     Key? key,
     required this.steps,
-    required this.originalTask, // Add this parameter
+    required this.originalTask, 
   }) : super(key: key);
 
   @override
