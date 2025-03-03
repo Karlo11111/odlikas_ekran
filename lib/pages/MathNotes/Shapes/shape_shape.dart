@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:odlikas_ekran/pages/MathNotes/math_notes.dart';
 
+// klasa modela oblika za whiteboard
 class ShapeShape {
   final ShapeType type;
   final Offset startPoint;
@@ -18,6 +19,7 @@ class ShapeShape {
     required this.strokeWidth,
   });
 
+  // metoda za pretvorbu oblika u mapu
   Map<String, dynamic> toMap() {
     return {
       'type': type.index,
@@ -30,6 +32,7 @@ class ShapeShape {
     };
   }
 
+  // metoda za kreiranje oblika iz mape
   factory ShapeShape.fromMap(Map<String, dynamic> map) {
     return ShapeShape(
       type: ShapeType.values[map['type'] as int],
@@ -46,20 +49,18 @@ class ShapeShape {
     );
   }
 
-  // Method to draw the shape
-  // In your ShapeShape class, modify the draw method:
   void draw(Canvas canvas) {
-    final fillOpacity = (strokeWidth - 1) / 29; // Convert 1-30 range to 0.0-1.0
+    final fillOpacity = (strokeWidth - 1) / 29;
     final outlinePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2; // Fixed outline thickness
+      ..strokeWidth = 2;
 
     final fillPaint = Paint()
       ..color = color.withOpacity(fillOpacity)
       ..style = PaintingStyle.fill;
 
-    // Calculate dimensions
+    // izracunaj dimenzije oblika
     final width = (endPoint.dx - startPoint.dx).abs();
     final height = (endPoint.dy - startPoint.dy).abs();
     final topLeft = Offset(

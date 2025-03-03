@@ -45,7 +45,7 @@ class VerticalProgressCircles extends StatelessWidget {
               fill = 1.0;
             } else if (streakCount > start) {
               fill = (streakCount - start) / sessionsPerDay;
-              fill = fill.clamp(0.0, 1.0); 
+              fill = fill.clamp(0.0, 1.0);
             }
 
             return Padding(
@@ -71,6 +71,7 @@ class VerticalProgressCircles extends StatelessWidget {
   }
 }
 
+// klasa za crtanje krugova za streak u pomodoro timeru
 class CircleProgressPainter extends CustomPainter {
   final double progress;
   final Color backgroundColor;
@@ -90,30 +91,29 @@ class CircleProgressPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = min(size.width / 2, size.height / 2);
 
-    // Draw the filled progress from the bottom up
+    // kreni od gore prema dole
     if (progress > 0) {
       final fillPaint = Paint()
         ..color = fillColor
         ..style = PaintingStyle.fill;
 
-      // Calculate the height of the filled area
+      // izracunaj visinu ispunjenog dijela
       final filledHeight = size.height * progress;
 
-      // Create a clip rectangle for the filled portion
       canvas.save();
       canvas.clipRect(Rect.fromLTRB(
         0,
         0, // kreni od vrha
         size.width,
-        filledHeight, 
+        filledHeight,
       ));
 
-      // Draw the filled circle within the clipped area
+      // nacrtaj ispunjeni krug
       canvas.drawCircle(center, radius, fillPaint);
       canvas.restore();
     }
 
-    // Draw number if circle is complete
+    // nacrtaj broj u sredini kruga ako je ispunjen
     if (number != null && progress == 1.0) {
       final textPainter = TextPainter(
         text: TextSpan(
@@ -127,7 +127,7 @@ class CircleProgressPainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       )..layout();
 
-      // Center the text
+      // centriraj tekst
       final textOffset = Offset(
         center.dx - textPainter.width / 2,
         center.dy - textPainter.height / 2,
@@ -135,7 +135,7 @@ class CircleProgressPainter extends CustomPainter {
       textPainter.paint(canvas, textOffset);
     }
 
-    // Draw the background border
+    // nacrtaj background border
     final backgroundPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.stroke

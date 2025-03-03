@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+// klassa za crtanje trokuta pomocu CustomPainter-a
 class TrianglePainter extends CustomPainter {
   final Color color;
 
@@ -28,6 +29,7 @@ class TrianglePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
+// klassa za crtanje heksagona pomocu CustomPainter-a
 class HexagonPainter extends CustomPainter {
   final Color color;
 

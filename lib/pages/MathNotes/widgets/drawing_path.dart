@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// klasa za crtanje putanje pomocu CustomPainter-a
 class DrawingPath {
   final List<Map<String, dynamic>> commands;
   final Color color;
@@ -13,6 +14,7 @@ class DrawingPath {
     required this.drawingMode,
   });
 
+  // metoda za pretvorbu putanje u flutterovu klasu - Path
   Path toPath() {
     final path = Path();
     for (final cmd in commands) {
@@ -48,6 +50,7 @@ class DrawingPath {
     return path;
   }
 
+  // metoda za pretvorbu putanje u mapu
   Map<String, dynamic> toMap() {
     return {
       'color': color.value,
@@ -57,6 +60,7 @@ class DrawingPath {
     };
   }
 
+  // metoda za kreiranje putanje iz mape
   factory DrawingPath.fromMap(Map<String, dynamic> map) {
     return DrawingPath(
       commands: List<Map<String, dynamic>>.from(map['commands'] as List),
@@ -67,4 +71,5 @@ class DrawingPath {
   }
 }
 
+// enumeracija za nacin crtanja
 enum DrawingMode { pen, marker, eraser }

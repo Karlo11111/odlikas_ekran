@@ -1,6 +1,6 @@
-// botun za biranje alata
 import 'package:flutter/material.dart';
 
+// klasa za gumb alata
 class ToolButton extends StatelessWidget {
   final Widget child;
   final VoidCallback onPressed;

@@ -146,8 +146,8 @@ class _MathNotesState extends State<MathNotes> {
 
   @override
   void dispose() {
-    _saveDebounce.cancel(); // Cancel pending debounced saves
-    _saveNow(); // Save immediately on exit
+    _saveDebounce.cancel(); // zaustavi debounce
+    _saveNow(); // spremi sve promjene
     super.dispose();
   }
 
@@ -168,7 +168,7 @@ class _MathNotesState extends State<MathNotes> {
         .toList();
   }
 
-// Helper function for deep conversion
+  // funkcija za pretvaranje mape u mapu stringova
   Map<String, dynamic> _convertMap(Map<dynamic, dynamic> originalMap) {
     return Map<String, dynamic>.fromIterable(
       originalMap.entries,
@@ -184,6 +184,7 @@ class _MathNotesState extends State<MathNotes> {
     );
   }
 
+  // funkcija za pretvaranje liste u listu stringova
   List<dynamic> _convertList(List<dynamic> originalList) {
     return originalList.map((item) {
       if (item is Map<dynamic, dynamic>) {
@@ -195,18 +196,18 @@ class _MathNotesState extends State<MathNotes> {
     }).toList();
   }
 
+  // funkcija za sejvanje whiteboarda
   Future<void> _autoSave({bool force = false}) async {
     if (force) {
-      await _saveNow(); // Save immediately without debounce
+      await _saveNow(); // spremi odma bez debounca
     } else {
       _saveDebounce.run(() => _saveNow());
     }
   }
 
+  // sejvaj objekt u hive bazu
   Future<void> _saveNow() async {
     try {
-      // Don't create a whole new object, instead update the existing one
-      // This preserves the Hive key/reference
       _whiteboardData.lastModified = DateTime.now();
       _whiteboardData.paths =
           List<Map<String, dynamic>>.from(_paths.map((p) => p.toMap()));
@@ -218,7 +219,7 @@ class _MathNotesState extends State<MathNotes> {
       _whiteboardData.shapes =
           List<Map<String, dynamic>>.from(_shapes.map((s) => s.toMap()));
 
-      // Safely capture new screenshot
+      // uzmi screenshot trenutnog whiteboarda za preview
       if (_whiteboardKey.currentContext != null &&
           _whiteboardKey.currentContext!.findRenderObject() != null &&
           _whiteboardKey.currentContext!.findRenderObject()
@@ -226,7 +227,7 @@ class _MathNotesState extends State<MathNotes> {
         final boundary = _whiteboardKey.currentContext!.findRenderObject()
             as RenderRepaintBoundary;
 
-        // Wait for stable frame
+        // cekaj dok bude stabilno (dok se user ne mice)
         await SchedulerBinding.instance.endOfFrame;
         if (boundary.debugNeedsPaint) {
           await Future.delayed(const Duration(milliseconds: 50));
@@ -244,7 +245,6 @@ class _MathNotesState extends State<MathNotes> {
         }
       }
 
-      // Save the modified existing object
       await _whiteboardData.save();
     } catch (e, stack) {
       debugPrint('Save error: $e\n$stack');
@@ -277,11 +277,11 @@ class _MathNotesState extends State<MathNotes> {
               if (image != null) {
                 setState(() => _capturedImage = image);
 
-                // Send image to Mathpix AI
+                // posalji sliku na mathpix
                 final MathpixAiSolving mathpixAiSolving = MathpixAiSolving();
                 final result = await mathpixAiSolving.sendImageToMathpix(image);
                 if (result != null) {
-                  // Sanitize the LaTeX result
+                  // uredi rezultat za prikaz
                   String sanitized =
                       result.replaceAll(r"\(", r"$$").replaceAll(r"\)", r"$$");
 
@@ -289,7 +289,7 @@ class _MathNotesState extends State<MathNotes> {
                     _latexResult = sanitized;
                   });
 
-                  // OpenAI service for solving math expressions
+                  // OpenAI servis za rjesavanje matematickih izraza
                   setState(() {
                     _isOpenAiLoading = true;
                     _openAiAnswer = null;
@@ -303,7 +303,7 @@ class _MathNotesState extends State<MathNotes> {
                     _isOpenAiLoading = false;
                   });
 
-                  // Navigate to Solution Steps Page
+                  // idi na stranicu sa objasnjen rjesenjem
                   if (openAiResult != null) {
                     Navigator.push(
                       context,
@@ -336,6 +336,7 @@ class _MathNotesState extends State<MathNotes> {
     );
   }
 
+  // funkcija za slikanje selektiranog dijela whiteboarda za AI
   Future<Uint8List?> _captureSelectedArea() async {
     final renderObject = _whiteboardKey.currentContext?.findRenderObject();
     if (renderObject == null ||
@@ -446,8 +447,8 @@ class _MathNotesState extends State<MathNotes> {
                       final newElement = TextElement(
                         id: DateTime.now().microsecondsSinceEpoch.toString(),
                         position: _transformPoint(details.localPosition),
-                        fontSize: 24, // Store base font size (not scaled)
-                        size: Size(150, 50), // Store base size (not scaled)
+                        fontSize: 24,
+                        size: Size(150, 50),
                         isEditing: true,
                       );
                       setState(() {
@@ -471,26 +472,19 @@ class _MathNotesState extends State<MathNotes> {
                 ),
                 // dodavanje pravog texta ne rukopis
                 ..._textElements.map((element) {
-                  // 1) In board space, the rectangle corners:
-                  //    top-left = element.position
-                  //    bottom-right = element.position + element.size
                   final Offset boardTopLeft = element.position;
                   final Offset boardBottomRight = element.position +
                       Offset(element.size.width, element.size.height);
 
-                  // 2) Convert both corners to screen space:
                   final Offset screenTopLeft = _applyMatrix(boardTopLeft);
                   final Offset screenBottomRight =
                       _applyMatrix(boardBottomRight);
 
-                  // 3) The resulting bounding box in screen space:
                   double boxLeft = screenTopLeft.dx;
                   double boxTop = screenTopLeft.dy;
                   double boxRight = screenBottomRight.dx;
                   double boxBottom = screenBottomRight.dy;
 
-                  // If your transform can flip coordinates (e.g. negative scaling),
-                  // ensure left < right and top < bottom by sorting:
                   if (boxRight < boxLeft) {
                     final temp = boxLeft;
                     boxLeft = boxRight;
@@ -505,26 +499,21 @@ class _MathNotesState extends State<MathNotes> {
                   final double boxWidth = boxRight - boxLeft;
                   final double boxHeight = boxBottom - boxTop;
 
-                  // 4) Derive a scale factor for the font:
-                  //    - For simplicity, scale by ratio of screenHeight to boardHeight.
-                  //    - If there's no rotation or severe distortion, this is fine.
-                  //    - If you do rotate the board, you'd need more advanced handling.
                   double boardHeight = element.size.height;
                   double fontScale =
                       (boardHeight == 0) ? 1 : (boxHeight / boardHeight);
                   if (fontScale.isNaN || fontScale.isInfinite) {
-                    fontScale = 1; // fallback if something weird
+                    fontScale = 1;
                   }
                   final double finalFontSize = element.fontSize * fontScale;
 
                   return Positioned(
                     left: boxLeft,
                     top: boxTop,
-                    // Use the scaled size in screen coordinates
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
 
-                      // Select text if user long-presses
+                      // ako korisnik long pressa da se text moze mciat
                       onLongPress: () {
                         setState(() {
                           _selectedTextElement = element;
@@ -532,19 +521,19 @@ class _MathNotesState extends State<MathNotes> {
                         });
                       },
 
-                      // Fixed: Drag the text in board space considering transformations
+                      // vuci text po whiteboardu
                       onPanUpdate: (details) {
                         setState(() {
-                          // Get the inverse of the transformation matrix
+                          // dobi inverznu matricu transformacije
                           final inverseMatrix =
                               Matrix4.inverted(_transformationMatrix);
 
-                          // Convert the delta to board space
+                          // pretvori delta u board space
                           final deltaVec = inverseMatrix.transform3(
                             vm.Vector3(details.delta.dx, details.delta.dy, 0),
                           );
 
-                          // Update position with the proper transformation
+                          // azuriraj poziciju teksta
                           element.position += Offset(deltaVec.x, deltaVec.y);
                         });
                       },
@@ -559,7 +548,7 @@ class _MathNotesState extends State<MathNotes> {
                         ),
                         child: Stack(
                           children: [
-                            // Editing vs. displayed text
+                            // ako je text u edit modu
                             if (element.isEditing)
                               TextField(
                                 autofocus: true,
@@ -575,11 +564,10 @@ class _MathNotesState extends State<MathNotes> {
                                 style: TextStyle(fontSize: finalFontSize),
                               ),
 
-                            // Resize handle if this is the selected text
+                            // rucka za resize texta
                             if (_selectedTextElement == element)
                               Positioned(
-                                right:
-                                    -10, // handle sits partly outside to appear as a corner
+                                right: -10,
                                 bottom: -10,
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
@@ -588,28 +576,27 @@ class _MathNotesState extends State<MathNotes> {
                                       final inverseMatrix = Matrix4.inverted(
                                           _transformationMatrix);
 
-                                      // Convert the delta to board space
+                                      // pretvori delta u board space
                                       final deltaVec = inverseMatrix.transform3(
                                         vm.Vector3(details.delta.dx,
                                             details.delta.dy, 0),
                                       );
 
-                                      // Apply a damping factor to make scaling less sensitive
+                                      // da bude manje osjetljivo
                                       double dampingFactor = 0.5;
 
-                                      // Update size with damping
                                       double newW = element.size.width +
                                           (deltaVec.x * dampingFactor);
                                       double newH = element.size.height +
                                           (deltaVec.y * dampingFactor);
 
-                                      // Clamp to avoid going negative
+                                      // da ne ide u negativne vrijednosti
                                       if (newW < 20) newW = 20;
                                       if (newH < 20) newH = 20;
 
                                       element.size = Size(newW, newH);
-                                      element.fontSize =
-                                          newH * 0.6; // 60% of height
+                                      element.fontSize = newH *
+                                          0.6; // dizi za 60% vrijednosti kada se resizea
                                     });
                                   },
                                   child: Container(
@@ -772,7 +759,7 @@ class _MathNotesState extends State<MathNotes> {
                 decoration: _panelDecoration,
                 child: Column(
                   children: [
-                    // Circle shape
+                    // Circle oblik
                     ToolButton(
                       isActive: _currentShapeType == ShapeType.circle,
                       onPressed: () {
@@ -794,7 +781,7 @@ class _MathNotesState extends State<MathNotes> {
                         ),
                       ),
                     ),
-                    // Square shape
+                    // Square oblik
                     ToolButton(
                       isActive: _currentShapeType == ShapeType.square,
                       onPressed: () {
@@ -815,7 +802,7 @@ class _MathNotesState extends State<MathNotes> {
                         ),
                       ),
                     ),
-                    // Triangle shape
+                    // Triangle oblik
                     ToolButton(
                       isActive: _currentShapeType == ShapeType.triangle,
                       onPressed: () {
@@ -832,7 +819,7 @@ class _MathNotesState extends State<MathNotes> {
                         ),
                       ),
                     ),
-                    // Hexagon shape
+                    // Hexagon oblik
                     ToolButton(
                       isActive: _currentShapeType == ShapeType.hexagon,
                       onPressed: () {
@@ -849,7 +836,7 @@ class _MathNotesState extends State<MathNotes> {
                         ),
                       ),
                     ),
-                    // Color/width indicator
+                    // Color/width indikator
                     ToolButton(
                       child: ColorWidthIndicator(
                           color: _currentColor, strokeWidth: _strokeWidth),
@@ -861,7 +848,7 @@ class _MathNotesState extends State<MathNotes> {
               ),
             ),
 
-          //prikazivanje widgeta za biranje vrstu olovke (marker, gumica, normalna olovka)
+          // prikazivanje widgeta za biranje vrstu olovke (marker, gumica, normalna olovka)
           if (_showPenOptions)
             Positioned(
               right: 100,
@@ -896,7 +883,7 @@ class _MathNotesState extends State<MathNotes> {
                           _drawingMode = DrawingMode.marker;
                           _currentColor = _toolSettings[_drawingMode]!
                               .color
-                              .withOpacity(0.5); // transparentno
+                              .withOpacity(0.5); // transparentno za marker
                           _strokeWidth =
                               _toolSettings[_drawingMode]!.strokeWidth;
                           _showColorOptions = false;
@@ -1055,7 +1042,7 @@ class _MathNotesState extends State<MathNotes> {
                           _changeTool(ToolMode.ai);
                           setState(() {
                             _isSelectingArea = true;
-                            // Disable other tools while selecting
+                            // zatvori sve ostale panele
                             _showShapeOptions = false;
                             _currentTool = ToolMode.ai;
                             _showPenOptions = false;
@@ -1067,7 +1054,7 @@ class _MathNotesState extends State<MathNotes> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Undo/Redo buttons
+                // Undo/Redo gumbi
                 Container(
                   decoration: _panelDecoration,
                   child: Column(
@@ -1094,7 +1081,7 @@ class _MathNotesState extends State<MathNotes> {
             ),
           ),
 
-          //AI selekcija i panel za prikazivanje uputa
+          // AI selekcija i panel za prikazivanje uputa
           if (_isSelectingArea) _buildSelectionOverlay(),
           if (_isSelectingArea)
             Positioned(
@@ -1148,7 +1135,7 @@ class _MathNotesState extends State<MathNotes> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Display the LaTeX result from Mathpix
+                    // prikazi latex rezultat iz mathpixa (ako je pronaden)
                     Align(
                       alignment: Alignment.topLeft,
                       child: LaTexT(
@@ -1162,7 +1149,7 @@ class _MathNotesState extends State<MathNotes> {
 
                     const SizedBox(height: 16),
 
-                    // Display the spinner if we are still loading the OpenAI answer
+                    // prikazi loading spinner dok se ceka na odgovor od OpenAI
                     if (_isOpenAiLoading) ...[
                       Image.asset(
                         'assets/animations/spinning_circle.gif',
@@ -1171,7 +1158,7 @@ class _MathNotesState extends State<MathNotes> {
                       ),
                     ],
 
-                    // Otherwise, display the OpenAI answer (if any)
+                    // ako postoji prikazi rjesenje od OpenAI
                     if (!_isOpenAiLoading && _openAiAnswer != null) ...[
                       const SizedBox(height: 16),
                       Text(
@@ -1225,6 +1212,8 @@ class _MathNotesState extends State<MathNotes> {
   // ----------------------------------------------------------
   //     SCALE HANDLERS (Handle pinch, pan, and drawing)
   // ----------------------------------------------------------
+
+  // funkcija za pocetak skaliranja
   void _handleScaleStart(ScaleStartDetails details) {
     if (_selectedTextElement != null) return;
 
@@ -1250,16 +1239,17 @@ class _MathNotesState extends State<MathNotes> {
       _currentShape = ShapeShape(
         type: _currentShapeType,
         startPoint: transformedPoint,
-        endPoint: transformedPoint, // Initialize both points to same position
+        endPoint: transformedPoint, // oboje na istoj poziciji
         color: _currentColor,
         strokeWidth: _strokeWidth,
       );
     }
   }
 
+  // funkcija za azuriranje skaliranje
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (details.scale != 1.0) {
-      // Handle zoom scaling
+      // zoom skaliranje
       final newScale = _lastScale * details.scale;
       final clampedScale = newScale.clamp(_minScale, _maxScale);
 
@@ -1281,7 +1271,7 @@ class _MathNotesState extends State<MathNotes> {
       setState(() {});
       _autoSave();
     } else if (_currentTool == ToolMode.hand) {
-      // Handle panning
+      // pomicanje whiteboarda
       final delta = details.focalPointDelta;
       _transformationMatrix.translate(
         delta.dx / _currentScale,
@@ -1308,6 +1298,7 @@ class _MathNotesState extends State<MathNotes> {
     }
   }
 
+  // funkcija za zavrsetak skaliranja
   void _handleScaleEnd(ScaleEndDetails details) {
     _lastPanOffset = null;
     if (_currentCommands != null && _currentPath != null) {
@@ -1342,12 +1333,14 @@ class _MathNotesState extends State<MathNotes> {
     return Offset(transformed.x, transformed.y);
   }
 
+  // funkcija za matricu transformacije
   Offset _applyMatrix(Offset whiteboardOffset) {
     final transformed = _transformationMatrix
         .transform3(vm.Vector3(whiteboardOffset.dx, whiteboardOffset.dy, 0));
     return Offset(transformed.x, transformed.y);
   }
 
+  // funkcija za azuriranje skale
   void _updateScale(double newScale, {Offset? focalPoint}) {
     final clampedScale = newScale.clamp(_minScale, _maxScale);
     if (focalPoint != null) {
@@ -1366,6 +1359,7 @@ class _MathNotesState extends State<MathNotes> {
     _autoSave();
   }
 
+  // funkcija za zumiranje whiteboarda
   void _zoomIn() => _updateScale(
         _currentScale * 1.1,
         focalPoint: Offset(
@@ -1374,6 +1368,7 @@ class _MathNotesState extends State<MathNotes> {
         ),
       );
 
+  // funkcija za odzumiranje whiteboarda
   void _zoomOut() => _updateScale(
         _currentScale * 0.9,
         focalPoint: Offset(
@@ -1382,6 +1377,7 @@ class _MathNotesState extends State<MathNotes> {
         ),
       );
 
+  // funkcija za mijenjanje alata
   void _changeTool(ToolMode mode) {
     setState(() {
       _currentTool = mode;
@@ -1394,7 +1390,6 @@ class _MathNotesState extends State<MathNotes> {
         _showPenOptions = false;
         _showColorOptions = false;
       }
-      // Clear any text editing states
       for (var element in _textElements) {
         element.isEditing = false;
       }
@@ -1402,19 +1397,20 @@ class _MathNotesState extends State<MathNotes> {
   }
 
   void _undo() {
-    // First try undoing paths
+    // prvo undoaj pathove
     if (_paths.isNotEmpty) {
       setState(() {
         _redoStack.add(_paths.removeLast());
       });
       _autoSave();
     }
-    // If no paths left, try undoing shapes
+    // ako nema pathova undoaj oblike
     else if (_shapes.isNotEmpty) {
       setState(() {
         _redoStack.add(_shapes.removeLast());
       });
       _autoSave();
+      // ako nema oblika undoaj text
     } else if (_textElements.isNotEmpty) {
       setState(() {
         _redoStack.add(_textElements.removeLast());
@@ -1423,6 +1419,7 @@ class _MathNotesState extends State<MathNotes> {
     }
   }
 
+  // funkcija za redo
   void _redo() {
     if (_redoStack.isNotEmpty) {
       setState(() {

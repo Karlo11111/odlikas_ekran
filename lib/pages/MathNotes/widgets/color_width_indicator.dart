@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// klasa za prikazivanje boje i debljine linije
 class ColorWidthIndicator extends StatelessWidget {
   final Color color;
   final double strokeWidth;

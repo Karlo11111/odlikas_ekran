@@ -33,6 +33,7 @@ class SelectionRectanglePainter extends CustomPainter {
       ..lineTo(rect.left, rect.bottom)
       ..close();
 
+    // iscrtaj pravokutnik za border
     canvas.drawPath(
       dashPath(
         path,
@@ -46,6 +47,7 @@ class SelectionRectanglePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
+// metoda za crtanje isprekidane linije
 Path dashPath(Path path, {required CircularIntervalList<double> dashArray}) {
   final dashPath = Path();
   for (final metric in path.computeMetrics()) {

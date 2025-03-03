@@ -21,6 +21,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
     whiteboardsBox = Hive.box<WhiteboardData>('whiteboards');
   }
 
+  // funkcija za kreiranje nove bilješke
   void _createNewNote(BuildContext context) async {
     final newNote = WhiteboardData(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -32,6 +33,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
       textElements: [],
     );
 
+    // varijabla za spremanje nove bilješke
     final box = Hive.box<WhiteboardData>('whiteboards');
     final key = await box.add(newNote);
     final savedNote = box.get(key);
@@ -101,13 +103,13 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
+                        // prvi container je za addanje novih bilješki
                         if (index == 0) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               AspectRatio(
-                                aspectRatio:
-                                    1.5, 
+                                aspectRatio: 1.5,
                                 child: GestureDetector(
                                   onTap: () => _createNewNote(context),
                                   child: Container(
@@ -117,7 +119,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                                         BoxShadow(
                                           color: Colors.black.withOpacity(0.15),
                                           blurRadius: 6,
-                                          offset: Offset(0, 2),
+                                          offset: const Offset(0, 2),
                                         ),
                                       ],
                                     ),
@@ -140,7 +142,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              // Text below the container
+                              // tekst ispod kontejnera
                               Padding(
                                 padding: const EdgeInsets.only(left: 4),
                                 child: Text(
@@ -173,6 +175,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
   }
 }
 
+// klasa za prikazivanje ostalih bilješke
 class _WhiteboardCard extends StatelessWidget {
   final WhiteboardData whiteboard;
   final int index;
@@ -184,9 +187,8 @@ class _WhiteboardCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // White container with content
         AspectRatio(
-          aspectRatio: 1.5, // Match the aspect ratio from the image
+          aspectRatio: 1.5,
           child: GestureDetector(
             onTap: () => _openWhiteboard(context),
             onLongPress: () => _showContextMenu(context),
@@ -201,7 +203,7 @@ class _WhiteboardCard extends StatelessWidget {
                   ),
                 ],
               ),
-              // Show screenshot or example content
+              // prikazivanje slike (preview) whiteboarda
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: whiteboard.screenshot != null
@@ -215,7 +217,7 @@ class _WhiteboardCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        // Project name below the container
+        // ime whiteboarda
         Padding(
           padding: const EdgeInsets.only(left: 4),
           child: Text(
@@ -231,6 +233,7 @@ class _WhiteboardCard extends StatelessWidget {
     );
   }
 
+  // funkcija za otvaranje whiteboarda
   void _openWhiteboard(BuildContext context) {
     Navigator.push(
       context,
@@ -240,6 +243,7 @@ class _WhiteboardCard extends StatelessWidget {
     );
   }
 
+  // funkcija za prikazivanje kontekstnog menija za brisanje
   void _showContextMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -269,6 +273,7 @@ class _WhiteboardCard extends StatelessWidget {
     );
   }
 
+  // funkcija za prikazivanje dijaloga za preimenovanje
   void _showRenameDialog(BuildContext context) {
     final textController = TextEditingController(text: whiteboard.name);
     showDialog(
@@ -297,6 +302,7 @@ class _WhiteboardCard extends StatelessWidget {
     );
   }
 
+  // funkcija za brisanje whiteboarda
   void _deleteWhiteboard(BuildContext context) {
     showDialog(
       context: context,

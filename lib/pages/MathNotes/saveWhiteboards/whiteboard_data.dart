@@ -33,6 +33,7 @@ class WhiteboardData extends HiveObject {
   @HiveField(8, defaultValue: [])
   List<Map<String, dynamic>> shapes = [];
 
+  // konstruktor za kreiranje whiteboarda
   WhiteboardData({
     required this.id,
     required this.name,
@@ -45,6 +46,7 @@ class WhiteboardData extends HiveObject {
     this.shapes = const [],
   });
 
+  // metoda za kopiranje whiteboarda
   WhiteboardData copyWith({
     String? id,
     String? name,

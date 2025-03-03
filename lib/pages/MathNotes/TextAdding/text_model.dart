@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+// klasa modela teksta za whiteboard
 class TextElement {
   final String id;
   String text;
@@ -16,6 +17,8 @@ class TextElement {
     this.size = const Size(150, 50),
     this.isEditing = false,
   });
+
+  // funkcija za pretvorbu teksta u mapu
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -29,6 +32,7 @@ class TextElement {
     };
   }
 
+  // funkcija za kreiranje teksta iz mape
   static TextElement fromMap(Map<String, dynamic> map) {
     return TextElement(
       id: map['id'],

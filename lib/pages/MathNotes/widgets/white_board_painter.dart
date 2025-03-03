@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_shape.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/drawing_path.dart';
 
+// klasa za crtanje putanja na whiteboardu
 class WhiteboardPainter extends CustomPainter {
   final List<DrawingPath> paths;
   final Matrix4 transformationMatrix;
@@ -26,12 +27,12 @@ class WhiteboardPainter extends CustomPainter {
     canvas.save();
     canvas.transform(transformationMatrix.storage);
 
-    // Draw stored shapes
+    // nacrtaj spremljene oblike
     for (final shape in shapes) {
       shape.draw(canvas);
     }
 
-    // Draw current in-progress shape
+    // naslikaj trenutni oblik
     if (currentShape != null) {
       currentShape!.draw(canvas);
     }
