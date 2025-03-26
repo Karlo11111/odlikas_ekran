@@ -97,7 +97,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 4,
-                      crossAxisSpacing: 40,
+                      crossAxisSpacing: 35,
                       mainAxisSpacing: 40,
                       childAspectRatio: 1.2,
                     ),
@@ -206,12 +206,43 @@ class _WhiteboardCard extends StatelessWidget {
               // prikazivanje slike (preview) whiteboarda
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: whiteboard.screenshot != null
-                    ? Image.memory(
-                        whiteboard.screenshot!,
-                        fit: BoxFit.cover,
-                      )
-                    : const Center(child: Text("No Preview")),
+                child: Builder(
+                  builder: (context) {
+                    // debugging informacije
+                    final hasScreenshot = whiteboard.screenshot != null;
+                    final screenshotLength =
+                        hasScreenshot ? whiteboard.screenshot!.length : 0;
+                    debugPrint(
+                        'Whiteboard ${whiteboard.id}: has screenshot: $hasScreenshot (${screenshotLength} bytes)');
+
+                    if (hasScreenshot && screenshotLength > 0) {
+                      try {
+                        return Image.memory(
+                          whiteboard.screenshot!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            debugPrint('Error loading image: $error');
+                            return Container(
+                              color: Colors.grey[200],
+                              child: const Center(child: Text("Image Error")),
+                            );
+                          },
+                        );
+                      } catch (e) {
+                        debugPrint('Exception loading image: $e');
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Center(child: Text("Image Exception")),
+                        );
+                      }
+                    } else {
+                      return Container(
+                        color: Colors.grey[200],
+                        child: const Center(child: Text("No Preview")),
+                      );
+                    }
+                  },
+                ),
               ),
             ),
           ),

@@ -15,6 +15,7 @@ import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_painters.dart';
 import 'package:odlikas_ekran/pages/MathNotes/TextAdding/text_model.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/debouncer.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.dart';
+import 'package:odlikas_ekran/pages/MathNotes/undoable_operation.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/color_width_indicator.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/drawing_path.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/select_rectangle_mathpix.dart';
@@ -93,7 +94,8 @@ class _MathNotesState extends State<MathNotes> {
 
   Offset? _lastPanOffset;
 
-  final List<dynamic> _redoStack = [];
+  List<UndoableAction> _undoStack = [];
+  List<UndoableAction> _redoStack = [];
 
   bool _showPenOptions = false;
   bool _showColorOptions = false;
@@ -219,33 +221,66 @@ class _MathNotesState extends State<MathNotes> {
       _whiteboardData.shapes =
           List<Map<String, dynamic>>.from(_shapes.map((s) => s.toMap()));
 
-      // uzmi screenshot trenutnog whiteboarda za preview
+      // Capture screenshot
       if (_whiteboardKey.currentContext != null &&
-          _whiteboardKey.currentContext!.findRenderObject() != null &&
-          _whiteboardKey.currentContext!.findRenderObject()
-              is RenderRepaintBoundary) {
-        final boundary = _whiteboardKey.currentContext!.findRenderObject()
-            as RenderRepaintBoundary;
-
-        // cekaj dok bude stabilno (dok se user ne mice)
-        await SchedulerBinding.instance.endOfFrame;
-        if (boundary.debugNeedsPaint) {
-          await Future.delayed(const Duration(milliseconds: 50));
-        }
-
+          _whiteboardKey.currentContext!.findRenderObject() != null) {
         try {
-          final uiImage = await boundary.toImage(pixelRatio: 2.5);
-          final byteData =
-              await uiImage.toByteData(format: ui.ImageByteFormat.png);
-          if (byteData != null) {
-            _whiteboardData.screenshot = byteData.buffer.asUint8List();
+          final boundary = _whiteboardKey.currentContext!.findRenderObject()
+              as RenderRepaintBoundary;
+
+          // Wait for the UI to be stable
+          await SchedulerBinding.instance.endOfFrame;
+
+          // Add a longer delay to ensure rendering is complete
+          await Future.delayed(const Duration(milliseconds: 300));
+
+          if (!boundary.debugNeedsPaint) {
+            final uiImage = await boundary.toImage(pixelRatio: 1.5);
+            final byteData =
+                await uiImage.toByteData(format: ui.ImageByteFormat.png);
+
+            if (byteData != null && byteData.lengthInBytes > 0) {
+              _whiteboardData.screenshot = byteData.buffer.asUint8List();
+              print('Screenshot captured: ${byteData.lengthInBytes} bytes');
+            } else {
+              print('Screenshot byte data is null or empty');
+            }
+          } else {
+            print('Boundary still needs paint, skipping screenshot');
           }
         } catch (screenshotError) {
           debugPrint('Screenshot capture error: $screenshotError');
         }
       }
 
-      await _whiteboardData.save();
+      // Try to save the whiteboard data to the Hive box
+      try {
+        await _whiteboardData.save();
+        debugPrint(
+            'Whiteboard saved successfully with ID: ${_whiteboardData.id}');
+
+        // Verify the save was successful
+        final savedWhiteboard = _whiteboardsBox.get(_whiteboardData.key);
+        if (savedWhiteboard != null) {
+          final hasScreenshot = savedWhiteboard.screenshot != null;
+          final screenshotLength =
+              hasScreenshot ? savedWhiteboard.screenshot!.length : 0;
+          debugPrint(
+              'Verification: Whiteboard has screenshot: $hasScreenshot (${screenshotLength} bytes)');
+        }
+      } catch (saveError) {
+        debugPrint('Error saving to Hive: $saveError');
+
+        // Fallback: try put method if save fails
+        try {
+          if (_whiteboardData.isInBox) {
+            await _whiteboardsBox.put(_whiteboardData.key, _whiteboardData);
+            debugPrint('Whiteboard saved with fallback put method');
+          }
+        } catch (fallbackError) {
+          debugPrint('Fallback save also failed: $fallbackError');
+        }
+      }
     } catch (e, stack) {
       debugPrint('Save error: $e\n$stack');
     }
@@ -451,8 +486,15 @@ class _MathNotesState extends State<MathNotes> {
                         size: const Size(150, 50),
                         isEditing: true,
                       );
+
                       setState(() {
+                        // Add text element directly and record the action
                         _textElements.add(newElement);
+                        _recordAction(UndoableAction(
+                          type: ActionType.addText,
+                          item: newElement,
+                        ));
+
                         _selectedTextElement = newElement;
                       });
                     }
@@ -670,7 +712,7 @@ class _MathNotesState extends State<MathNotes> {
                             child: Align(
                               alignment: Alignment.centerLeft,
                               child: Text(
-                                'Debljina',
+                                _showShapeOptions ? 'Ispunjenost' : 'Debljina',
                                 style: GoogleFonts.inter(
                                   color: Colors.grey[700],
                                   fontSize: 16,
@@ -1295,27 +1337,39 @@ class _MathNotesState extends State<MathNotes> {
   }
 
   // funkcija za zavrsetak skaliranja
+
   void _handleScaleEnd(ScaleEndDetails details) {
     _lastPanOffset = null;
     if (_currentCommands != null && _currentPath != null) {
-      _paths.add(
-        DrawingPath(
-          commands: _currentCommands!,
-          color: _currentColor,
-          strokeWidth: _strokeWidth,
-          drawingMode: _drawingMode,
-        ),
+      final path = DrawingPath(
+        commands: _currentCommands!,
+        color: _currentColor,
+        strokeWidth: _strokeWidth,
+        drawingMode: _drawingMode,
       );
+
+      // dodaj path direktno i zabiljezi akciju
+      _paths.add(path);
+      _recordAction(UndoableAction(
+        type: ActionType.addPath,
+        item: path,
+      ));
+
       _currentCommands = null;
       _currentPath = null;
-      _autoSave();
     }
+
     if (_currentShape != null) {
       setState(() {
+        // dodaj oblik direktno i zabiljezi akciju
         _shapes.add(_currentShape!);
+        _recordAction(UndoableAction(
+          type: ActionType.addShape,
+          item: _currentShape!,
+        ));
+
         _currentShape = null;
       });
-      _autoSave();
     }
   }
 
@@ -1326,13 +1380,6 @@ class _MathNotesState extends State<MathNotes> {
     final inverseMatrix = Matrix4.inverted(_transformationMatrix);
     final transformed = inverseMatrix
         .transform3(vm.Vector3(screenOffset.dx, screenOffset.dy, 0));
-    return Offset(transformed.x, transformed.y);
-  }
-
-  // funkcija za matricu transformacije
-  Offset _applyMatrix(Offset whiteboardOffset) {
-    final transformed = _transformationMatrix
-        .transform3(vm.Vector3(whiteboardOffset.dx, whiteboardOffset.dy, 0));
     return Offset(transformed.x, transformed.y);
   }
 
@@ -1392,42 +1439,200 @@ class _MathNotesState extends State<MathNotes> {
     });
   }
 
-  void _undo() {
-    // prvo undoaj pathove
-    if (_paths.isNotEmpty) {
-      setState(() {
-        _redoStack.add(_paths.removeLast());
-      });
-      _autoSave();
-    }
-    // ako nema pathova undoaj oblike
-    else if (_shapes.isNotEmpty) {
-      setState(() {
-        _redoStack.add(_shapes.removeLast());
-      });
-      _autoSave();
-      // ako nema oblika undoaj text
-    } else if (_textElements.isNotEmpty) {
-      setState(() {
-        _redoStack.add(_textElements.removeLast());
-      });
-      _autoSave();
-    }
+  void _recordAction(UndoableAction action) {
+    _undoStack.add(action);
+    // izbrisi redo stack kad se nesto novo doda
+    _redoStack.clear();
+    _autoSave();
   }
 
-  // funkcija za redo
-  void _redo() {
-    if (_redoStack.isNotEmpty) {
-      setState(() {
-        final item = _redoStack.removeLast();
-        if (item is DrawingPath) {
-          _paths.add(item);
-        } else if (item is ShapeShape) {
-          _shapes.add(item);
-        }
-      });
-      _autoSave();
+  T _getTypedItem<T>(dynamic item) {
+    if (item is T) {
+      return item;
     }
+    throw Exception(
+        'Invalid item type: expected $T but got ${item.runtimeType}');
+  }
+
+  // undo funkcija
+  void _undo() {
+    if (_undoStack.isEmpty) return;
+
+    final action = _undoStack.removeLast();
+    _redoStack.add(action);
+
+    setState(() {
+      switch (action.type) {
+        case ActionType.addPath:
+          final lastIndex = _paths.length - 1;
+          if (lastIndex >= 0) {
+            final path = _paths.removeAt(lastIndex);
+            _redoStack.last = UndoableAction(
+              type: ActionType.deletePath,
+              item: path,
+              index: lastIndex,
+              timestamp: action.timestamp,
+            );
+          }
+          break;
+
+        case ActionType.addShape:
+          final lastIndex = _shapes.length - 1;
+          if (lastIndex >= 0) {
+            final shape = _shapes.removeAt(lastIndex);
+            _redoStack.last = UndoableAction(
+              type: ActionType.deleteShape,
+              item: shape,
+              index: lastIndex,
+              timestamp: action.timestamp,
+            );
+          }
+          break;
+
+        case ActionType.addText:
+          final lastIndex = _textElements.length - 1;
+          if (lastIndex >= 0) {
+            final text = _textElements.removeAt(lastIndex);
+            _redoStack.last = UndoableAction(
+              type: ActionType.deleteText,
+              item: text,
+              index: lastIndex,
+              timestamp: action.timestamp,
+            );
+          }
+          break;
+
+        case ActionType.deletePath:
+          try {
+            final path = _getTypedItem<DrawingPath>(action.item);
+            if (action.index >= 0 && action.index <= _paths.length) {
+              _paths.insert(action.index, path);
+            } else {
+              _paths.add(path);
+            }
+          } catch (e) {
+            print('Error during undo: $e');
+          }
+          break;
+
+        case ActionType.deleteShape:
+          try {
+            final shape = _getTypedItem<ShapeShape>(action.item);
+            if (action.index >= 0 && action.index <= _shapes.length) {
+              _shapes.insert(action.index, shape);
+            } else {
+              _shapes.add(shape);
+            }
+          } catch (e) {
+            print('Error during undo: $e');
+          }
+          break;
+
+        case ActionType.deleteText:
+          try {
+            final text = _getTypedItem<TextElement>(action.item);
+            if (action.index >= 0 && action.index <= _textElements.length) {
+              _textElements.insert(action.index, text);
+            } else {
+              _textElements.add(text);
+            }
+          } catch (e) {
+            print('Error during undo: $e');
+          }
+          break;
+      }
+    });
+
+    _autoSave();
+  }
+
+  // redo funkcija
+  void _redo() {
+    if (_redoStack.isEmpty) return;
+
+    final action = _redoStack.removeLast();
+    _undoStack.add(action);
+
+    setState(() {
+      switch (action.type) {
+        case ActionType.deletePath:
+          try {
+            final path = _getTypedItem<DrawingPath>(action.item);
+            if (action.index >= 0 && action.index < _paths.length) {
+              _paths.insert(action.index, path);
+            } else {
+              _paths.add(path);
+            }
+            _undoStack.last = UndoableAction(
+              type: ActionType.addPath,
+              item: path,
+              timestamp: action.timestamp,
+            );
+          } catch (e) {
+            print('Error during redo: $e');
+          }
+          break;
+
+        case ActionType.deleteShape:
+          try {
+            final shape = _getTypedItem<ShapeShape>(action.item);
+            if (action.index >= 0 && action.index < _shapes.length) {
+              _shapes.insert(action.index, shape);
+            } else {
+              _shapes.add(shape);
+            }
+            _undoStack.last = UndoableAction(
+              type: ActionType.addShape,
+              item: shape,
+              timestamp: action.timestamp,
+            );
+          } catch (e) {
+            print('Error during redo: $e');
+          }
+          break;
+
+        case ActionType.deleteText:
+          try {
+            final text = _getTypedItem<TextElement>(action.item);
+            if (action.index >= 0 && action.index < _textElements.length) {
+              _textElements.insert(action.index, text);
+            } else {
+              _textElements.add(text);
+            }
+            _undoStack.last = UndoableAction(
+              type: ActionType.addText,
+              item: text,
+              timestamp: action.timestamp,
+            );
+          } catch (e) {
+            print('Error during redo: $e');
+          }
+          break;
+
+        case ActionType.addPath:
+          final lastIndex = _paths.length - 1;
+          if (lastIndex >= 0) {
+            _paths.removeAt(lastIndex);
+          }
+          break;
+
+        case ActionType.addShape:
+          final lastIndex = _shapes.length - 1;
+          if (lastIndex >= 0) {
+            _shapes.removeAt(lastIndex);
+          }
+          break;
+
+        case ActionType.addText:
+          final lastIndex = _textElements.length - 1;
+          if (lastIndex >= 0) {
+            _textElements.removeAt(lastIndex);
+          }
+          break;
+      }
+    });
+
+    _autoSave();
   }
 
   // ----------------------------------------------------------
