@@ -479,24 +479,95 @@ class _MathNotesState extends State<MathNotes> {
                   onScaleEnd: _handleScaleEnd,
                   onTapDown: (details) {
                     if (_currentTool == ToolMode.text) {
-                      final newElement = TextElement(
-                        id: DateTime.now().microsecondsSinceEpoch.toString(),
-                        position: _transformPoint(details.localPosition),
-                        fontSize: 24,
-                        size: const Size(150, 50),
-                        isEditing: true,
-                      );
+                      // prvo provjeri jesmo li kliknuli na postojeci text
+                      bool clickedOnExistingText = false;
 
-                      setState(() {
-                        // Add text element directly and record the action
-                        _textElements.add(newElement);
-                        _recordAction(UndoableAction(
-                          type: ActionType.addText,
-                          item: newElement,
-                        ));
+                      for (final element in _textElements) {
+                        // dobij poziciju i velicinu text elementa
+                        final Offset elementPosition = element.position;
+                        final Size elementSize = element.size;
 
-                        _selectedTextElement = newElement;
-                      });
+                        // primjeni transformaciju na poziciju i velicinu
+                        final double scale =
+                            _transformationMatrix.getMaxScaleOnAxis();
+                        final double dx =
+                            _transformationMatrix.getTranslation().x;
+                        final double dy =
+                            _transformationMatrix.getTranslation().y;
+
+                        final Offset transformedPosition = Offset(
+                            elementPosition.dx * scale + dx,
+                            elementPosition.dy * scale + dy);
+
+                        // napravi pravokutnik oko elementa
+                        final Rect elementRect = Rect.fromLTWH(
+                            transformedPosition.dx,
+                            transformedPosition.dy,
+                            elementSize.width * scale,
+                            elementSize.height * scale);
+
+                        // provjeri je li kliknuto unutar pravokutnika
+                        if (elementRect.contains(details.localPosition)) {
+                          clickedOnExistingText = true;
+                          break;
+                        }
+                      }
+
+                      if (!clickedOnExistingText) {
+                        // Ako vec postoji selektirani text element, deselektiraj ga
+                        if (_selectedTextElement != null) {
+                          setState(() {
+                            // prvo provjeri je li element u edit modu
+                            if (_selectedTextElement!.isEditing) {
+                              _selectedTextElement!.isEditing = false;
+                            }
+                            _selectedTextElement = null;
+
+                            // Promijeni tool na ruku (panning) nakon deselekcije teksta
+                            _currentTool = ToolMode.hand;
+
+                            // makni tipkovnicu
+                            FocusManager.instance.primaryFocus?.unfocus();
+                          });
+                        }
+                        // Inace dodaj novi text element
+                        else {
+                          // dobij trenutni scale (zoom in / out)
+                          final double scale =
+                              _transformationMatrix.getMaxScaleOnAxis();
+
+                          // bazicne velicine za text
+                          const double baseWidth = 150.0;
+                          const double baseHeight = 50.0;
+                          const double baseFontSize = 24.0;
+
+                          // izracunaj velicinu i poziciju texta bazi na trenutnom scaleu
+                          // manja velicina (odzumirano) = veca velicina
+                          final double adjustedWidth = baseWidth / scale;
+                          final double adjustedHeight = baseHeight / scale;
+                          final double adjustedFontSize = baseFontSize / scale;
+
+                          // napravi novi text element s scale odredenim pozicijama i velicinama
+                          final newElement = TextElement(
+                            id: DateTime.now()
+                                .microsecondsSinceEpoch
+                                .toString(),
+                            position: _transformPoint(details.localPosition),
+                            fontSize: adjustedFontSize,
+                            size: Size(adjustedWidth, adjustedHeight),
+                            isEditing: true,
+                          );
+
+                          setState(() {
+                            _textElements.add(newElement);
+                            _recordAction(UndoableAction(
+                              type: ActionType.addText,
+                              item: newElement,
+                            ));
+                            _selectedTextElement = newElement;
+                          });
+                        }
+                      }
                     }
                   },
                   child: CustomPaint(
@@ -513,27 +584,26 @@ class _MathNotesState extends State<MathNotes> {
                   ),
                 ),
                 // dodavanje pravog texta ne rukopis
-                // Replace the text elements mapping section with this improved version
                 ..._textElements.map((element) {
-                  // Store the original positions and dimensions
+                  // spremi originalnu poziciju i velicinu
                   final Offset originalPosition = element.position;
                   final Size originalSize = element.size;
 
-                  // Apply only the scaling component of the transformation
+                  // primjeni transformaciju na poziciju i velicinu
                   final double scale =
                       _transformationMatrix.getMaxScaleOnAxis();
 
-                  // Calculate the translated position correctly
-                  // First get the translation components from the matrix
+                  // izracunaj translaciju iz matrice (znaci koliko smo se micali po ekranu)
+                  // prvo dobij trenutni scale i translaciju
                   final double dx = _transformationMatrix.getTranslation().x;
                   final double dy = _transformationMatrix.getTranslation().y;
 
-                  // Apply the transformation properly - scale the position and add translation
+                  // pravilna promjena transformacije - skaliranje polozaja i dodavanje prijevoda
                   final Offset transformedPosition = Offset(
                       originalPosition.dx * scale + dx,
                       originalPosition.dy * scale + dy);
 
-                  // Calculate scaled size and font
+                  // izracunaj velicinu i font size
                   final double scaledFontSize = element.fontSize * scale;
                   final Size scaledSize = Size(
                       originalSize.width * scale, originalSize.height * scale);
@@ -543,6 +613,12 @@ class _MathNotesState extends State<MathNotes> {
                     top: transformedPosition.dy,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        setState(() {
+                          _selectedTextElement = element;
+                          _currentTool = ToolMode.text;
+                        });
+                      },
                       onLongPress: () {
                         setState(() {
                           _selectedTextElement = element;
@@ -550,29 +626,29 @@ class _MathNotesState extends State<MathNotes> {
                         });
                       },
                       onPanStart: (details) {
-                        // Only allow moving if the text element is selected
+                        // dozvoli pomicanje samo ako je text element selektiran
                         if (_selectedTextElement == element) {
                           _lastPanOffset = details.localPosition;
                         }
                       },
                       onPanUpdate: (details) {
-                        // Only move if the text element is selected and we have a valid last pan offset
+                        // dozvoli pomicanje samo ako je text element selektiran i ako znamo zadnji offset
                         if (_selectedTextElement == element &&
                             _lastPanOffset != null) {
                           setState(() {
-                            // Convert screen delta to board delta by dividing by scale
+                            // pretvori delta u odnosu na scale faktor
                             final Offset delta = details.delta / scale;
 
-                            // Update the original position
+                            // azuriraj poziciju elementa
                             element.position += delta;
 
-                            // Update last pan offset
+                            // azuriraj zadnji pan offset
                             _lastPanOffset = details.localPosition;
                           });
                         }
                       },
                       onPanEnd: (details) {
-                        // Reset last pan offset
+                        // resetiraj zadnji pan offset
                         _lastPanOffset = null;
                       },
                       child: Container(
@@ -585,7 +661,7 @@ class _MathNotesState extends State<MathNotes> {
                         ),
                         child: Stack(
                           children: [
-                            // Editing state
+                            // editanje texta
                             if (element.isEditing)
                               TextField(
                                 autofocus: true,
@@ -593,13 +669,18 @@ class _MathNotesState extends State<MathNotes> {
                                   fontSize: scaledFontSize,
                                   color: Colors.black,
                                 ),
-                                decoration: InputDecoration(
+                                decoration: const InputDecoration(
                                   border: InputBorder.none,
                                   isDense: true,
                                 ),
                                 onChanged: (value) => element.text = value,
                                 onSubmitted: (value) {
-                                  setState(() => element.isEditing = false);
+                                  setState(() {
+                                    element.isEditing = false;
+                                    // makni tipkovnicu
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                  });
                                 },
                               )
                             else
@@ -611,7 +692,7 @@ class _MathNotesState extends State<MathNotes> {
                                 ),
                               ),
 
-                            // Resize handle
+                            // rucka za resizanje
                             if (_selectedTextElement == element)
                               Positioned(
                                 right: -10,
@@ -620,18 +701,18 @@ class _MathNotesState extends State<MathNotes> {
                                   behavior: HitTestBehavior.opaque,
                                   onPanUpdate: (details) {
                                     setState(() {
-                                      // Apply scale factor to resize deltas
+                                      // primjena faktora razmjera za promjenu veličine delte
                                       double newWidth = element.size.width +
                                           (details.delta.dx / scale) * 0.5;
                                       double newHeight = element.size.height +
                                           (details.delta.dy / scale) * 0.5;
 
-                                      // Prevent extremely small sizes
+                                      // ograniči veličinu da nije premala i ode u minus
                                       newWidth = max(50, newWidth);
                                       newHeight = max(30, newHeight);
 
                                       element.size = Size(newWidth, newHeight);
-                                      // Proportional font sizing
+                                      // proporcionalno promijeni font size
                                       element.fontSize = newHeight * 0.5;
                                     });
                                   },
@@ -656,7 +737,7 @@ class _MathNotesState extends State<MathNotes> {
               ],
             ),
           ),
-          // return botun
+          // return gumb
           Positioned(
             top: 25,
             left: 35,
@@ -1428,6 +1509,8 @@ class _MathNotesState extends State<MathNotes> {
         _selectedTextElement = null;
         _showPenOptions = false;
         _showColorOptions = false;
+        // makni tipkovnicu ako nije text tool
+        FocusManager.instance.primaryFocus?.unfocus();
       }
       if (mode == ToolMode.hand) {
         _showPenOptions = false;
