@@ -47,7 +47,7 @@ class SelectionRectanglePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-// metoda za crtanje isprekidane linije
+// metoda za crtanje isprekidane linije za selectanje AI-ja
 Path dashPath(Path path, {required CircularIntervalList<double> dashArray}) {
   final dashPath = Path();
   for (final metric in path.computeMetrics()) {

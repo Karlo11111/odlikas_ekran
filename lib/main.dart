@@ -7,6 +7,7 @@ import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.da
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_galery.dart';
 import 'package:odlikas_ekran/pages/PomodoroTimer/pomodoro_timer_page.dart';
 import 'package:odlikas_ekran/pages/ToDoList/todo_list.dart';
+import 'package:odlikas_ekran/pages/UploadFiles/uploaded_files.dart';
 import 'package:odlikas_ekran/viewmodels/test_viewmodel.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -44,7 +45,7 @@ void main() async {
   // full-screen mode
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  // provjeri shared preferences 
+  // provjeri shared preferences
   final prefs = await SharedPreferences.getInstance();
   final setupDone = prefs.getBool('setupDone') ?? false;
   final String screenId = prefs.getString('screenId') ?? '';
@@ -105,6 +106,7 @@ class MyApp extends StatelessWidget {
           '/pomodoro': (context) => const PomodoroTimerPage(),
           '/photomath': (context) => const WhiteboardGalleryPage(),
           '/todo': (context) => const TodoList(),
+          "/files": (context) => const UploadFilesPages(),
         },
       ),
     );

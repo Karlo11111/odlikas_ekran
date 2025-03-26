@@ -1,7 +1,7 @@
 // ignore_for_file: prefer_final_fields, unused_field, depend_on_referenced_packages, library_private_types_in_public_api, deprecated_member_use, avoid_print
 
 import 'dart:ui';
-
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
@@ -448,7 +448,7 @@ class _MathNotesState extends State<MathNotes> {
                         id: DateTime.now().microsecondsSinceEpoch.toString(),
                         position: _transformPoint(details.localPosition),
                         fontSize: 24,
-                        size: Size(150, 50),
+                        size: const Size(150, 50),
                         isEditing: true,
                       );
                       setState(() {
@@ -471,88 +471,90 @@ class _MathNotesState extends State<MathNotes> {
                   ),
                 ),
                 // dodavanje pravog texta ne rukopis
+                // Replace the text elements mapping section with this improved version
                 ..._textElements.map((element) {
-                  final Offset boardTopLeft = element.position;
-                  final Offset boardBottomRight = element.position +
-                      Offset(element.size.width, element.size.height);
+                  // Store the original positions and dimensions
+                  final Offset originalPosition = element.position;
+                  final Size originalSize = element.size;
 
-                  final Offset screenTopLeft = _applyMatrix(boardTopLeft);
-                  final Offset screenBottomRight =
-                      _applyMatrix(boardBottomRight);
+                  // Apply only the scaling component of the transformation
+                  final double scale =
+                      _transformationMatrix.getMaxScaleOnAxis();
 
-                  double boxLeft = screenTopLeft.dx;
-                  double boxTop = screenTopLeft.dy;
-                  double boxRight = screenBottomRight.dx;
-                  double boxBottom = screenBottomRight.dy;
+                  // Calculate the translated position correctly
+                  // First get the translation components from the matrix
+                  final double dx = _transformationMatrix.getTranslation().x;
+                  final double dy = _transformationMatrix.getTranslation().y;
 
-                  if (boxRight < boxLeft) {
-                    final temp = boxLeft;
-                    boxLeft = boxRight;
-                    boxRight = temp;
-                  }
-                  if (boxBottom < boxTop) {
-                    final temp = boxTop;
-                    boxTop = boxBottom;
-                    boxBottom = temp;
-                  }
+                  // Apply the transformation properly - scale the position and add translation
+                  final Offset transformedPosition = Offset(
+                      originalPosition.dx * scale + dx,
+                      originalPosition.dy * scale + dy);
 
-                  final double boxWidth = boxRight - boxLeft;
-                  final double boxHeight = boxBottom - boxTop;
-
-                  double boardHeight = element.size.height;
-                  double fontScale =
-                      (boardHeight == 0) ? 1 : (boxHeight / boardHeight);
-                  if (fontScale.isNaN || fontScale.isInfinite) {
-                    fontScale = 1;
-                  }
-                  final double finalFontSize = element.fontSize * fontScale;
+                  // Calculate scaled size and font
+                  final double scaledFontSize = element.fontSize * scale;
+                  final Size scaledSize = Size(
+                      originalSize.width * scale, originalSize.height * scale);
 
                   return Positioned(
-                    left: boxLeft,
-                    top: boxTop,
+                    left: transformedPosition.dx,
+                    top: transformedPosition.dy,
                     child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-
-                      // ako korisnik long pressa da se text moze mciat
+                      behavior: HitTestBehavior.translucent,
                       onLongPress: () {
                         setState(() {
                           _selectedTextElement = element;
                           _currentTool = ToolMode.text;
                         });
                       },
-
-                      // vuci text po whiteboardu
-                      onPanUpdate: (details) {
-                        setState(() {
-                          // dobi inverznu matricu transformacije
-                          final inverseMatrix =
-                              Matrix4.inverted(_transformationMatrix);
-
-                          // pretvori delta u board space
-                          final deltaVec = inverseMatrix.transform3(
-                            vm.Vector3(details.delta.dx, details.delta.dy, 0),
-                          );
-
-                          // azuriraj poziciju teksta
-                          element.position += Offset(deltaVec.x, deltaVec.y);
-                        });
+                      onPanStart: (details) {
+                        // Only allow moving if the text element is selected
+                        if (_selectedTextElement == element) {
+                          _lastPanOffset = details.localPosition;
+                        }
                       },
+                      onPanUpdate: (details) {
+                        // Only move if the text element is selected and we have a valid last pan offset
+                        if (_selectedTextElement == element &&
+                            _lastPanOffset != null) {
+                          setState(() {
+                            // Convert screen delta to board delta by dividing by scale
+                            final Offset delta = details.delta / scale;
 
+                            // Update the original position
+                            element.position += delta;
+
+                            // Update last pan offset
+                            _lastPanOffset = details.localPosition;
+                          });
+                        }
+                      },
+                      onPanEnd: (details) {
+                        // Reset last pan offset
+                        _lastPanOffset = null;
+                      },
                       child: Container(
-                        width: boxWidth,
-                        height: boxHeight,
+                        width: scaledSize.width,
+                        height: scaledSize.height,
                         decoration: BoxDecoration(
                           border: (_selectedTextElement == element)
-                              ? Border.all(color: Colors.blue, width: 1)
+                              ? Border.all(color: Colors.blue, width: 2)
                               : null,
                         ),
                         child: Stack(
                           children: [
-                            // ako je text u edit modu
+                            // Editing state
                             if (element.isEditing)
                               TextField(
                                 autofocus: true,
-                                style: TextStyle(fontSize: finalFontSize),
+                                style: TextStyle(
+                                  fontSize: scaledFontSize,
+                                  color: Colors.black,
+                                ),
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                ),
                                 onChanged: (value) => element.text = value,
                                 onSubmitted: (value) {
                                   setState(() => element.isEditing = false);
@@ -561,10 +563,13 @@ class _MathNotesState extends State<MathNotes> {
                             else
                               Text(
                                 element.text,
-                                style: TextStyle(fontSize: finalFontSize),
+                                style: TextStyle(
+                                  fontSize: scaledFontSize,
+                                  color: Colors.black,
+                                ),
                               ),
 
-                            // rucka za resize texta
+                            // Resize handle
                             if (_selectedTextElement == element)
                               Positioned(
                                 right: -10,
@@ -573,39 +578,29 @@ class _MathNotesState extends State<MathNotes> {
                                   behavior: HitTestBehavior.opaque,
                                   onPanUpdate: (details) {
                                     setState(() {
-                                      final inverseMatrix = Matrix4.inverted(
-                                          _transformationMatrix);
+                                      // Apply scale factor to resize deltas
+                                      double newWidth = element.size.width +
+                                          (details.delta.dx / scale) * 0.5;
+                                      double newHeight = element.size.height +
+                                          (details.delta.dy / scale) * 0.5;
 
-                                      // pretvori delta u board space
-                                      final deltaVec = inverseMatrix.transform3(
-                                        vm.Vector3(details.delta.dx,
-                                            details.delta.dy, 0),
-                                      );
+                                      // Prevent extremely small sizes
+                                      newWidth = max(50, newWidth);
+                                      newHeight = max(30, newHeight);
 
-                                      // da bude manje osjetljivo
-                                      double dampingFactor = 0.5;
-
-                                      double newW = element.size.width +
-                                          (deltaVec.x * dampingFactor);
-                                      double newH = element.size.height +
-                                          (deltaVec.y * dampingFactor);
-
-                                      // da ne ide u negativne vrijednosti
-                                      if (newW < 20) newW = 20;
-                                      if (newH < 20) newH = 20;
-
-                                      element.size = Size(newW, newH);
-                                      element.fontSize = newH *
-                                          0.6; // dizi za 60% vrijednosti kada se resizea
+                                      element.size = Size(newWidth, newHeight);
+                                      // Proportional font sizing
+                                      element.fontSize = newHeight * 0.5;
                                     });
                                   },
                                   child: Container(
-                                    width: 20,
-                                    height: 20,
+                                    width: 30,
+                                    height: 30,
                                     decoration: BoxDecoration(
                                       color: Colors.blue,
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white),
+                                      border: Border.all(
+                                          color: Colors.white, width: 2),
                                     ),
                                   ),
                                 ),
@@ -940,6 +935,7 @@ class _MathNotesState extends State<MathNotes> {
                     _showPenOptions = !_showPenOptions;
                     _showColorOptions = false;
                   });
+                  Navigator.pushNamed(context, "/files");
                 },
                 child: Image.asset(
                   'assets/icons/notes_upload.png',

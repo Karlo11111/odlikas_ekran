@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// klasa za interakciju sa Firestore bazom podataka za Pomodoro timer
 class FirestorePomodoroService {
   final String timerId;
   final int daysLearning;
@@ -10,11 +9,9 @@ class FirestorePomodoroService {
       : daysLearning = days,
         hoursLearning = hours;
 
-  // referenca na dokument u Firestore bazi podataka
   DocumentReference get timerDoc =>
       FirebaseFirestore.instance.collection('pomodoroTimers').doc(timerId);
 
-  // metoda za inicijalizaciju timera
   Future<void> initializeTimer() async {
     final docSnapshot = await timerDoc.get();
     if (!docSnapshot.exists) {
@@ -31,19 +28,23 @@ class FirestorePomodoroService {
     }
   }
 
-  // metoda za pokretanje timera
+  // Modified method to use client timestamp and adjust for Firebase delay
   Future<void> startTimer(
       String currentPhase, int duration, int cycleCount) async {
+    // Use client timestamp instead of server timestamp
+    final clientTimestamp = Timestamp.now();
+
     await timerDoc.set({
       'currentPhase': currentPhase,
       'currentDuration': duration,
       'isRunning': true,
       'cycleCount': cycleCount,
-      'startTimestamp': FieldValue.serverTimestamp(), // vrijeme servera
+      'startTimestamp': clientTimestamp, // Use client-side timestamp
+      'clientStartTime':
+          DateTime.now().millisecondsSinceEpoch, // Store client time
     }, SetOptions(merge: true));
   }
 
-  // metoda za zaustavljanje timera s lokalnim preostalim vremenom
   Future<void> stopTimerWithLocalLeftover(int localLeftover) async {
     final docSnapshot = await timerDoc.get();
     if (docSnapshot.exists) {
@@ -51,11 +52,11 @@ class FirestorePomodoroService {
         'currentDuration': localLeftover,
         'isRunning': false,
         'startTimestamp': null,
+        'clientStartTime': null,
       });
     }
   }
 
-  // metoda za prelazak u sljedeću fazu
   Future<void> forwardPhase(
       String newPhase, int newDuration, int cycleCount) async {
     final now = DateTime.now();
@@ -65,18 +66,16 @@ class FirestorePomodoroService {
       'cycleCount': cycleCount,
       'isRunning': false,
       'startTimestamp': null,
+      'clientStartTime': null,
     };
 
     final doc = await timerDoc.get();
     final existingData = doc.data() as Map<String, dynamic>;
 
-    // Handle null case for lastUpdatedWeek
     final lastUpdatedWeek = existingData['lastUpdatedWeek'] as Timestamp?;
 
-    final lastUpdated = lastUpdatedWeek?.toDate() ??
-        DateTime(2000); // Use a default old date if null
+    final lastUpdated = lastUpdatedWeek?.toDate() ?? DateTime(2000);
 
-    // Handle null cases for weekly values
     int weeklySessions = existingData['weeklySessions'] ?? 0;
     int weeklyStreak = existingData['weeklyStreak'] ?? 0;
 
@@ -103,7 +102,6 @@ class FirestorePomodoroService {
         aStart.day == bStart.day;
   }
 
-  // slusaj promjene na timeru
   Stream<DocumentSnapshot> listenToTimer() {
     return timerDoc.snapshots();
   }

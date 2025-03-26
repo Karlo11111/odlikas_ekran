@@ -113,7 +113,6 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
   }
 
   void _listenToPomodoroChanges() {
-    // ovaj dio slusa firebase promjene
     pomodoroService.listenToTimer().listen((snapshot) {
       if (snapshot.exists) {
         final data = snapshot.data()!;
@@ -127,53 +126,99 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
           _streakCount = mapData['streakCount'] ?? 0;
           _weeklySessions = data['weeklySessions'] ?? 0;
           _weeklyStreak = data['weeklyStreak'] ?? 0;
-        });
 
-        if (_isRunning && _startTimestamp != null) {
-          final now = DateTime.now();
-          final elapsed = now.difference(_startTimestamp!.toDate()).inSeconds;
-          final secondsLeft =
-              (_initialDuration - elapsed).clamp(0, _initialDuration);
-          _secondsNotifier.value = secondsLeft;
-          if (!(_localTimer?.isActive ?? false)) {
-            _startLocalTicker();
+          // Get client start time if available
+          final clientStartTime = mapData['clientStartTime'] as int?;
+
+          if (_isRunning && _startTimestamp != null) {
+            int secondsLeft;
+
+            if (clientStartTime != null) {
+              // Use client time for more accurate time calculation
+              final now = DateTime.now().millisecondsSinceEpoch;
+              final elapsedMillis = now - clientStartTime;
+              final elapsedSeconds = elapsedMillis ~/ 1000;
+              secondsLeft = (_initialDuration - elapsedSeconds)
+                  .clamp(0, _initialDuration);
+            } else {
+              // Fallback to server timestamp if client time not available
+              final now = DateTime.now();
+              final elapsed =
+                  now.difference(_startTimestamp!.toDate()).inSeconds;
+              secondsLeft =
+                  (_initialDuration - elapsed).clamp(0, _initialDuration);
+            }
+
+            _secondsNotifier.value = secondsLeft;
+
+            // Start the timer only if not already active
+            if (!(_localTimer?.isActive ?? false)) {
+              _startLocalTicker();
+            }
+          } else {
+            _secondsNotifier.value = _initialDuration;
+            _stopLocalTicker();
           }
-        } else {
-          _secondsNotifier.value = _initialDuration;
-          _stopLocalTicker();
-        }
+        });
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _localTimer?.cancel();
-    super.dispose();
   }
 
   // kreni s lokalnim tickerom koji odbrojava vrijeme savake sec
   void _startLocalTicker() {
     if (_localTimer != null && _localTimer!.isActive) return;
 
-    _localTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _localTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (!_isRunning || _startTimestamp == null) {
         _stopLocalTicker();
         return;
       }
 
-      final now = DateTime.now();
-      final elapsed = now.difference(_startTimestamp!.toDate()).inSeconds;
-      final secondsLeft =
-          (_initialDuration - elapsed).clamp(0, _initialDuration);
+      final timerData = await _getTimerData();
+      final clientStartTime = timerData?['clientStartTime'] as int?;
+
+      int secondsLeft;
+      if (clientStartTime != null) {
+        // Use client time for more accurate time calculation
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final elapsedMillis = now - clientStartTime;
+        final elapsedSeconds = elapsedMillis ~/ 1000;
+        secondsLeft =
+            (_initialDuration - elapsedSeconds).clamp(0, _initialDuration);
+      } else {
+        // Fallback to server timestamp if client time not available
+        final now = DateTime.now();
+        final elapsed = now.difference(_startTimestamp!.toDate()).inSeconds;
+        secondsLeft = (_initialDuration - elapsed).clamp(0, _initialDuration);
+      }
 
       _secondsNotifier.value = secondsLeft;
 
       if (secondsLeft <= 0) {
         _stopLocalTicker();
-        _forwardTimer(); // tranzicija s jedne faze na drugu
+        _forwardTimer(); // Move to next phase
       }
     });
+  }
+
+  // Helper method to get current timer data
+  Future<Map<String, dynamic>?>? _getTimerData() {
+    try {
+      final snapshot = FirebaseFirestore.instance
+          .collection('pomodoroTimers')
+          .doc(_email)
+          .get()
+          .then((doc) => doc.data());
+      return snapshot;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _localTimer?.cancel();
+    super.dispose();
   }
 
   // stopiraj lokalni timer
@@ -290,10 +335,8 @@ class _PomodoroTimerPageState extends State<PomodoroTimerPage> {
                               _currentPhase, leftover, _cycleCount);
                           setState(() {
                             _isRunning = true;
-                            _startTimestamp = Timestamp.now();
                             _initialDuration = leftover;
                           });
-                          _startLocalTicker();
                         },
                         stopTimer: () {
                           final now = DateTime.now();
