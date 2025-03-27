@@ -1,15 +1,15 @@
-// ignore_for_file: prefer_final_fields, unused_field, depend_on_referenced_packages, library_private_types_in_public_api, deprecated_member_use, avoid_print
+// ignore_for_file: prefer_final_fields, unused_field, depend_on_referenced_packages, library_private_types_in_public_api, deprecated_member_use, avoid_print, unused_local_variable
 
 import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive/hive.dart';
 import 'package:latext/latext.dart';
 import 'package:odlikas_ekran/database/api/matpix_ai_solving.dart';
 import 'package:odlikas_ekran/database/api/open_ai_service.dart';
+import 'package:odlikas_ekran/pages/MathNotes/ImagesAdding/image_element.dart';
 import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_shape.dart';
 import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_painters.dart';
 import 'package:odlikas_ekran/pages/MathNotes/TextAdding/text_model.dart';
@@ -23,6 +23,7 @@ import 'package:odlikas_ekran/pages/MathNotes/widgets/select_rectangle_mathpix.d
 import 'package:odlikas_ekran/pages/MathNotes/widgets/tool.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/white_board_painter.dart';
 import 'package:odlikas_ekran/pages/SolutionStepsPage/solution_steps_page.dart';
+import 'package:odlikas_ekran/pages/UploadFiles/uploaded_files.dart';
 import 'package:vector_math/vector_math_64.dart' as vm;
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:typed_data';
@@ -117,6 +118,10 @@ class _MathNotesState extends State<MathNotes> {
   // Add a list to store shapes
   List<ShapeShape> _shapes = [];
 
+  // adding images to the board
+  List<ImageElement> _imageElements = [];
+  ImageElement? _selectedImageElement;
+
   // ovo je za ai mathpix image
   Uint8List? _capturedImage;
   String? _latexResult;
@@ -137,6 +142,10 @@ class _MathNotesState extends State<MathNotes> {
     _whiteboardsBox = Hive.box<WhiteboardData>('whiteboards');
     _whiteboardData = widget.whiteboardData!;
     _loadSavedState();
+
+    _imageElements = _whiteboardData.imageElements
+        .map((img) => ImageElement.fromMap(_convertMap(img)))
+        .toList();
 
     // delay prvi autosave dok se rendera app
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -208,8 +217,37 @@ class _MathNotesState extends State<MathNotes> {
     }
   }
 
-  // sejvaj objekt u hive bazu
+  // funkcija za dodavanje slike na whiteboard
+  void _addImageToWhiteboard(String imageUrl) {
+    final center = Offset(
+      MediaQuery.of(context).size.width / 2,
+      MediaQuery.of(context).size.height / 2,
+    );
 
+    final transformedCenter = _transformPoint(center);
+
+    final newImage = ImageElement(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      imageUrl: imageUrl,
+      position: transformedCenter,
+      size: const Size(
+          300, 200), // Default size - can be adjusted based on screen size
+    );
+
+    setState(() {
+      _imageElements.add(newImage);
+      _recordAction(UndoableAction(
+        type: ActionType.addImage,
+        item: newImage,
+      ));
+      _selectedImageElement = newImage;
+      _currentTool = ToolMode.image;
+    });
+
+    _autoSave();
+  }
+
+  // sejvaj objekt u hive bazu
   Future<void> _saveNow() async {
     try {
       // Prepare data for saving as before
@@ -223,6 +261,8 @@ class _MathNotesState extends State<MathNotes> {
           _textElements.map((te) => te.toMap()));
       _whiteboardData.shapes =
           List<Map<String, dynamic>>.from(_shapes.map((s) => s.toMap()));
+      _whiteboardData.imageElements = List<Map<String, dynamic>>.from(
+          _imageElements.map((img) => img.toMap()));
 
       // New approach: manually draw everything to a canvas instead of using RepaintBoundary
       try {
@@ -565,27 +605,31 @@ class _MathNotesState extends State<MathNotes> {
         children: [
           // ----------------------------------------------------------
           //     WHITEBOARD MAIN GESTURE DETECTOR
-          // ----------------------------------------------------------
           RepaintBoundary(
             key: _whiteboardKey,
-            // stack da kada se uzme screenshot za whiteboard preview da se vide tekst i oblici
             child: Stack(
               children: [
+                // Drawing canvas - bottom layer
                 GestureDetector(
+                  behavior: HitTestBehavior.translucent,
                   onScaleStart: _handleScaleStart,
                   onScaleUpdate: _handleScaleUpdate,
                   onScaleEnd: _handleScaleEnd,
-                  onTapDown: (details) {
-                    if (_currentTool == ToolMode.text) {
-                      // prvo provjeri jesmo li kliknuli na postojeci text
-                      bool clickedOnExistingText = false;
+                  // Modify your canvas GestureDetector's onTapDown handler:
 
+                  onTapDown: (details) {
+                    // This only handles whiteboard/canvas related gestures
+                    if (_currentTool == ToolMode.text) {
+                      // Only create a new text element if we're in text mode
+                      // First check if we clicked on an existing element
+                      bool clickedOnExistingText = false;
+                      bool clickedOnExistingImage = false;
+
+                      // Check if clicked on existing text
                       for (final element in _textElements) {
-                        // dobij poziciju i velicinu text elementa
                         final Offset elementPosition = element.position;
                         final Size elementSize = element.size;
 
-                        // primjeni transformaciju na poziciju i velicinu
                         final double scale =
                             _transformationMatrix.getMaxScaleOnAxis();
                         final double dx =
@@ -597,74 +641,190 @@ class _MathNotesState extends State<MathNotes> {
                             elementPosition.dx * scale + dx,
                             elementPosition.dy * scale + dy);
 
-                        // napravi pravokutnik oko elementa
                         final Rect elementRect = Rect.fromLTWH(
                             transformedPosition.dx,
                             transformedPosition.dy,
                             elementSize.width * scale,
                             elementSize.height * scale);
 
-                        // provjeri je li kliknuto unutar pravokutnika
+                        if (elementRect.contains(details.localPosition)) {
+                          clickedOnExistingText = true;
+                          setState(() {
+                            _selectedTextElement = element;
+                          });
+                          break;
+                        }
+                      }
+
+                      // Check if clicked on existing image
+                      for (final element in _imageElements) {
+                        final Offset elementPosition = element.position;
+                        final Size elementSize = element.size;
+
+                        final double scale =
+                            _transformationMatrix.getMaxScaleOnAxis();
+                        final double dx =
+                            _transformationMatrix.getTranslation().x;
+                        final double dy =
+                            _transformationMatrix.getTranslation().y;
+
+                        final Offset transformedPosition = Offset(
+                            elementPosition.dx * scale + dx,
+                            elementPosition.dy * scale + dy);
+
+                        final Rect elementRect = Rect.fromLTWH(
+                            transformedPosition.dx,
+                            transformedPosition.dy,
+                            elementSize.width * scale,
+                            elementSize.height * scale);
+
+                        if (elementRect.contains(details.localPosition)) {
+                          clickedOnExistingImage = true;
+                          break;
+                        }
+                      }
+
+                      if (!clickedOnExistingText && !clickedOnExistingImage) {
+                        // Add a new text element only if we didn't click on an existing element
+                        // Get current scale (zoom in/out)
+                        final double scale =
+                            _transformationMatrix.getMaxScaleOnAxis();
+
+                        // Base sizes for text
+                        const double baseWidth = 150.0;
+                        const double baseHeight = 50.0;
+                        const double baseFontSize = 24.0;
+
+                        // Calculate size and position based on current scale
+                        final double adjustedWidth = baseWidth / scale;
+                        final double adjustedHeight = baseHeight / scale;
+                        final double adjustedFontSize = baseFontSize / scale;
+
+                        // Create new text element with scale-determined positions and sizes
+                        final newElement = TextElement(
+                          id: DateTime.now().microsecondsSinceEpoch.toString(),
+                          position: _transformPoint(details.localPosition),
+                          fontSize: adjustedFontSize,
+                          size: Size(adjustedWidth, adjustedHeight),
+                          isEditing: true,
+                        );
+
+                        setState(() {
+                          // If there's a selected text element, deselect it
+                          if (_selectedTextElement != null) {
+                            if (_selectedTextElement!.isEditing) {
+                              _selectedTextElement!.isEditing = false;
+                            }
+                          }
+
+                          // Deselect any selected image when adding text
+                          if (_selectedImageElement != null) {
+                            _selectedImageElement = null;
+                          }
+
+                          _textElements.add(newElement);
+                          _recordAction(UndoableAction(
+                            type: ActionType.addText,
+                            item: newElement,
+                          ));
+                          _selectedTextElement = newElement;
+                        });
+                      }
+                    } else {
+                      // For all other tools, check if we're clicking on any elements
+                      bool clickedOnExistingText = false;
+                      bool clickedOnExistingImage = false;
+
+                      // Check if clicked on existing text
+                      for (final element in _textElements) {
+                        final Offset elementPosition = element.position;
+                        final Size elementSize = element.size;
+
+                        final double scale =
+                            _transformationMatrix.getMaxScaleOnAxis();
+                        final double dx =
+                            _transformationMatrix.getTranslation().x;
+                        final double dy =
+                            _transformationMatrix.getTranslation().y;
+
+                        final Offset transformedPosition = Offset(
+                            elementPosition.dx * scale + dx,
+                            elementPosition.dy * scale + dy);
+
+                        final Rect elementRect = Rect.fromLTWH(
+                            transformedPosition.dx,
+                            transformedPosition.dy,
+                            elementSize.width * scale,
+                            elementSize.height * scale);
+
                         if (elementRect.contains(details.localPosition)) {
                           clickedOnExistingText = true;
                           break;
                         }
                       }
 
-                      if (!clickedOnExistingText) {
-                        // Ako vec postoji selektirani text element, deselektiraj ga
+                      // Check if clicked on existing image
+                      for (final element in _imageElements) {
+                        final Offset elementPosition = element.position;
+                        final Size elementSize = element.size;
+
+                        final double scale =
+                            _transformationMatrix.getMaxScaleOnAxis();
+                        final double dx =
+                            _transformationMatrix.getTranslation().x;
+                        final double dy =
+                            _transformationMatrix.getTranslation().y;
+
+                        final Offset transformedPosition = Offset(
+                            elementPosition.dx * scale + dx,
+                            elementPosition.dy * scale + dy);
+
+                        final Rect elementRect = Rect.fromLTWH(
+                            transformedPosition.dx,
+                            transformedPosition.dy,
+                            elementSize.width * scale,
+                            elementSize.height * scale);
+
+                        if (elementRect.contains(details.localPosition)) {
+                          clickedOnExistingImage = true;
+                          break;
+                        }
+                      }
+
+                      // If we didn't click on any element, deselect and switch to hand tool
+                      if (!clickedOnExistingText && !clickedOnExistingImage) {
+                        bool selectionChanged = false;
+
                         if (_selectedTextElement != null) {
+                          selectionChanged = true;
                           setState(() {
-                            // prvo provjeri je li element u edit modu
+                            // Check if element is in edit mode
                             if (_selectedTextElement!.isEditing) {
                               _selectedTextElement!.isEditing = false;
                             }
                             _selectedTextElement = null;
-
-                            // Promijeni tool na ruku (panning) nakon deselekcije teksta
-                            _currentTool = ToolMode.hand;
-
-                            // makni tipkovnicu
-                            FocusManager.instance.primaryFocus?.unfocus();
                           });
                         }
-                        // Inace dodaj novi text element
-                        else {
-                          // dobij trenutni scale (zoom in / out)
-                          final double scale =
-                              _transformationMatrix.getMaxScaleOnAxis();
 
-                          // bazicne velicine za text
-                          const double baseWidth = 150.0;
-                          const double baseHeight = 50.0;
-                          const double baseFontSize = 24.0;
-
-                          // izracunaj velicinu i poziciju texta bazi na trenutnom scaleu
-                          // manja velicina (odzumirano) = veca velicina
-                          final double adjustedWidth = baseWidth / scale;
-                          final double adjustedHeight = baseHeight / scale;
-                          final double adjustedFontSize = baseFontSize / scale;
-
-                          // napravi novi text element s scale odredenim pozicijama i velicinama
-                          final newElement = TextElement(
-                            id: DateTime.now()
-                                .microsecondsSinceEpoch
-                                .toString(),
-                            position: _transformPoint(details.localPosition),
-                            fontSize: adjustedFontSize,
-                            size: Size(adjustedWidth, adjustedHeight),
-                            isEditing: true,
-                          );
-
+                        if (_selectedImageElement != null) {
+                          selectionChanged = true;
                           setState(() {
-                            _textElements.add(newElement);
-                            _recordAction(UndoableAction(
-                              type: ActionType.addText,
-                              item: newElement,
-                            ));
-                            _selectedTextElement = newElement;
+                            _selectedImageElement = null;
+                            // Set to hand tool when deselecting
+                            _currentTool = ToolMode.hand;
                           });
                         }
+
+                        // If the tool isn't specifically a tool that should stay active
+                        if (_currentTool == ToolMode.image ||
+                            _currentTool == ToolMode.text) {
+                          setState(() {
+                            _currentTool = ToolMode.hand;
+                          });
+                        }
+
+                        // Dismiss keyboard
+                        FocusManager.instance.primaryFocus?.unfocus();
                       }
                     }
                   },
@@ -681,6 +841,229 @@ class _MathNotesState extends State<MathNotes> {
                     size: Size.infinite,
                   ),
                 ),
+
+                // Images layer - middle layer
+                ...(_imageElements.map((element) {
+                  // Apply transformation matrix
+                  final double scale =
+                      _transformationMatrix.getMaxScaleOnAxis();
+                  final double dx = _transformationMatrix.getTranslation().x;
+                  final double dy = _transformationMatrix.getTranslation().y;
+
+                  // Transform the position
+                  final Offset transformedPosition = Offset(
+                    element.position.dx * scale + dx,
+                    element.position.dy * scale + dy,
+                  );
+
+                  // Calculate scaled size
+                  final Size scaledSize = Size(
+                    element.size.width * scale,
+                    element.size.height * scale,
+                  );
+
+                  return Positioned(
+                    left: transformedPosition.dx,
+                    top: transformedPosition.dy,
+                    child: GestureDetector(
+                      behavior:
+                          HitTestBehavior.opaque, // Important: Change to opaque
+                      onTap: () {
+                        // Only select/deselect on tap
+                        setState(() {
+                          // Deselect any selected text
+                          if (_selectedTextElement != null) {
+                            if (_selectedTextElement!.isEditing) {
+                              _selectedTextElement!.isEditing = false;
+                            }
+                            _selectedTextElement = null;
+                          }
+
+                          // Select/deselect this image
+                          if (_selectedImageElement == element) {
+                            _selectedImageElement = null;
+                            _currentTool = ToolMode.hand;
+                          } else {
+                            _selectedImageElement = element;
+                            _currentTool = ToolMode.image;
+                          }
+                        });
+                      },
+                      onLongPress: () {
+                        // Set as selected on long press
+                        setState(() {
+                          // Deselect any selected text
+                          if (_selectedTextElement != null) {
+                            if (_selectedTextElement!.isEditing) {
+                              _selectedTextElement!.isEditing = false;
+                            }
+                            _selectedTextElement = null;
+                          }
+
+                          _selectedImageElement = element;
+                          _currentTool = ToolMode.image;
+                        });
+                      },
+                      onPanStart: (details) {
+                        if (_selectedImageElement == element) {
+                          _lastPanOffset = details.localPosition;
+                        }
+                      },
+                      onPanUpdate: (details) {
+                        if (_selectedImageElement == element &&
+                            _lastPanOffset != null) {
+                          setState(() {
+                            // Convert delta to account for scale
+                            final Offset delta = details.delta / scale;
+                            element.position += delta;
+                            _lastPanOffset = details.localPosition;
+                          });
+                        }
+                      },
+                      onPanEnd: (details) {
+                        _lastPanOffset = null;
+                      },
+                      child: Stack(
+                        clipBehavior:
+                            Clip.none, // Important: Allow children to overflow
+                        children: [
+                          // Main image container with border if selected
+                          Container(
+                            width: scaledSize.width,
+                            height: scaledSize.height,
+                            decoration: BoxDecoration(
+                              border: (_selectedImageElement == element)
+                                  ? Border.all(color: Colors.blue, width: 2)
+                                  : null,
+                            ),
+                            child: Opacity(
+                              opacity: element.opacity,
+                              child: Image.network(
+                                element.imageUrl,
+                                width: scaledSize.width,
+                                height: scaledSize.height,
+                                fit: BoxFit.cover,
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                  if (loadingProgress == null) {
+                                    return child;
+                                  }
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value:
+                                          loadingProgress.expectedTotalBytes !=
+                                                  null
+                                              ? loadingProgress
+                                                      .cumulativeBytesLoaded /
+                                                  loadingProgress
+                                                      .expectedTotalBytes!
+                                              : null,
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.broken_image,
+                                        size: 40,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+
+                          // Only show these controls when the image is selected
+                          if (_selectedImageElement == element) ...[
+                            // Resize handle (bottom right)
+                            Positioned(
+                              right: -15,
+                              bottom: -15,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onPanUpdate: (details) {
+                                  setState(() {
+                                    double newWidth = element.size.width +
+                                        (details.delta.dx / scale);
+                                    double newHeight = element.size.height +
+                                        (details.delta.dy / scale);
+
+                                    // Limit minimum size
+                                    newWidth =
+                                        newWidth.clamp(50.0, double.infinity);
+                                    newHeight =
+                                        newHeight.clamp(50.0, double.infinity);
+
+                                    element.size = Size(newWidth, newHeight);
+                                  });
+                                },
+                                child: Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 2),
+                                  ),
+                                  child: const Icon(
+                                    Icons.open_with,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Delete button (top right)
+                            Positioned(
+                              right: -15,
+                              top: -15,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  setState(() {
+                                    final index =
+                                        _imageElements.indexOf(element);
+                                    if (index != -1) {
+                                      final removedImage =
+                                          _imageElements.removeAt(index);
+                                      _recordAction(UndoableAction(
+                                        type: ActionType.deleteImage,
+                                        item: removedImage,
+                                        index: index,
+                                      ));
+                                      _selectedImageElement = null;
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 2),
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                })),
                 // dodavanje pravog texta ne rukopis
                 ..._textElements.map((element) {
                   // spremi originalnu poziciju i velicinu
@@ -1151,12 +1534,19 @@ class _MathNotesState extends State<MathNotes> {
               decoration: _panelDecoration,
               child: ToolButton(
                 onPressed: () {
-                  _changeTool(ToolMode.pen);
+                  _changeTool(ToolMode.hand);
                   setState(() {
-                    _showPenOptions = !_showPenOptions;
+                    _showPenOptions = false;
                     _showColorOptions = false;
                   });
-                  Navigator.pushNamed(context, "/files");
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UploadFilesPages(
+                        onImageSelected: _addImageToWhiteboard,
+                      ),
+                    ),
+                  );
                 },
                 child: Image.asset(
                   'assets/icons/notes_upload.png',
@@ -1721,6 +2111,30 @@ class _MathNotesState extends State<MathNotes> {
             print('Error during undo: $e');
           }
           break;
+        case ActionType.addImage:
+          final lastIndex = _imageElements.length - 1;
+          if (lastIndex >= 0) {
+            final image = _imageElements.removeAt(lastIndex);
+            _redoStack.last = UndoableAction(
+              type: ActionType.deleteImage,
+              item: image,
+              index: lastIndex,
+              timestamp: action.timestamp,
+            );
+          }
+          break;
+        case ActionType.deleteImage:
+          try {
+            final image = _getTypedItem<ImageElement>(action.item);
+            if (action.index >= 0 && action.index <= _imageElements.length) {
+              _imageElements.insert(action.index, image);
+            } else {
+              _imageElements.add(image);
+            }
+          } catch (e) {
+            print('Error during undo: $e');
+          }
+          break;
       }
     });
 
@@ -1797,6 +2211,32 @@ class _MathNotesState extends State<MathNotes> {
           }
           break;
 
+        case ActionType.addImage:
+          final lastIndex = _imageElements.length - 1;
+          if (lastIndex >= 0) {
+            final image = _imageElements.removeAt(lastIndex);
+            _redoStack.last = UndoableAction(
+              type: ActionType.deleteImage,
+              item: image,
+              index: lastIndex,
+              timestamp: action.timestamp,
+            );
+          }
+          break;
+
+        case ActionType.deleteImage:
+          try {
+            final image = _getTypedItem<ImageElement>(action.item);
+            if (action.index >= 0 && action.index <= _imageElements.length) {
+              _imageElements.insert(action.index, image);
+            } else {
+              _imageElements.add(image);
+            }
+          } catch (e) {
+            print('Error during undo: $e');
+          }
+          break;
+
         case ActionType.addShape:
           final lastIndex = _shapes.length - 1;
           if (lastIndex >= 0) {
@@ -1833,7 +2273,7 @@ class _MathNotesState extends State<MathNotes> {
   );
 }
 
-enum ToolMode { hand, pen, text, shape, ai }
+enum ToolMode { hand, pen, text, shape, ai, image }
 
 enum DrawingTool { pen, marker, eraser }
 

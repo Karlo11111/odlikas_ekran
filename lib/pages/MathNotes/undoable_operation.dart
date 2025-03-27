@@ -3,9 +3,11 @@ enum ActionType {
   addPath,
   addShape,
   addText,
+  addImage,
   deletePath,
   deleteShape,
-  deleteText
+  deleteText,
+  deleteImage
 }
 
 class UndoableAction {

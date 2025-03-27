@@ -33,6 +33,9 @@ class WhiteboardData extends HiveObject {
   @HiveField(8, defaultValue: [])
   List<Map<String, dynamic>> shapes = [];
 
+  @HiveField(9, defaultValue: [])
+  List<Map<String, dynamic>> imageElements = [];
+
   // konstruktor za kreiranje whiteboarda
   WhiteboardData({
     required this.id,
@@ -44,6 +47,7 @@ class WhiteboardData extends HiveObject {
     Uint8List? screenshot,
     this.textElements = const [],
     this.shapes = const [],
+    this.imageElements = const [],
   });
 
   // metoda za kopiranje whiteboarda
@@ -57,6 +61,7 @@ class WhiteboardData extends HiveObject {
     Uint8List? screenshot,
     List<Map<String, dynamic>>? textElements,
     List<Map<String, dynamic>>? shapes,
+    List<Map<String, dynamic>>? imageElements,
   }) {
     return WhiteboardData(
       id: id ?? this.id,
@@ -68,6 +73,7 @@ class WhiteboardData extends HiveObject {
       screenshot: screenshot ?? this.screenshot,
       textElements: textElements ?? this.textElements,
       shapes: shapes ?? this.shapes,
+      imageElements: imageElements ?? this.imageElements,
     );
   }
 }

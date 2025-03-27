@@ -7,7 +7,12 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UploadFilesPages extends StatefulWidget {
-  const UploadFilesPages({super.key});
+  final Function(String imageUrl)? onImageSelected;
+
+  const UploadFilesPages({
+    super.key,
+    this.onImageSelected,
+  });
 
   @override
   State<UploadFilesPages> createState() => _UploadFilesPagesState();
@@ -119,6 +124,13 @@ class _UploadFilesPagesState extends State<UploadFilesPages> {
     }
   }
 
+  void _handleImageSelection(String fileUrl) {
+    if (widget.onImageSelected != null) {
+      widget.onImageSelected!(fileUrl);
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -187,7 +199,7 @@ class _UploadFilesPagesState extends State<UploadFilesPages> {
               padding: const EdgeInsets.all(16),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4, // dva stupca
+                  crossAxisCount: 4, // četiri stupca
                   mainAxisSpacing: 16,
                   crossAxisSpacing: 16,
                   childAspectRatio: 1.5,
@@ -197,32 +209,57 @@ class _UploadFilesPagesState extends State<UploadFilesPages> {
                     final file = _files[index];
                     final fileName = file['name'] ?? 'N/A';
                     final fileUrl = file['url'] ?? '';
-                    // Za sada pretpostavljamo da je sve slika (PNG, JPG...).
-                    // Kasnije možete provjeriti ekstenziju i prikazati PDF preview, itd.
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Prikaži sliku
-                        Image.network(
-                          fileUrl,
-                          width: 200,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.picture_as_pdf,
-                              size: 120,
-                              color: Colors.grey,
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          fileName,
-                          style: GoogleFonts.inter(fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+
+                    // Check if it's an image (simple check based on extension)
+                    final bool isImage = _isImageFile(fileName);
+
+                    return InkWell(
+                      onTap: () {
+                        if (isImage) {
+                          _handleImageSelection(fileUrl);
+                        }
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Image or PDF icon
+                          Container(
+                            width: 200,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: isImage
+                                ? Image.network(
+                                    fileUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Center(
+                                        child: Icon(
+                                          Icons.image_not_supported,
+                                          size: 40,
+                                          color: Colors.grey,
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : const Center(
+                                    child: Icon(
+                                      Icons.picture_as_pdf,
+                                      size: 40,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            fileName,
+                            style: GoogleFonts.inter(fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     );
                   },
                   childCount: _files.length,
@@ -232,5 +269,14 @@ class _UploadFilesPagesState extends State<UploadFilesPages> {
         ],
       ),
     );
+  }
+
+  bool _isImageFile(String fileName) {
+    final lowerCaseName = fileName.toLowerCase();
+    return lowerCaseName.endsWith('.jpg') ||
+        lowerCaseName.endsWith('.jpeg') ||
+        lowerCaseName.endsWith('.png') ||
+        lowerCaseName.endsWith('.gif') ||
+        lowerCaseName.endsWith('.webp');
   }
 }
