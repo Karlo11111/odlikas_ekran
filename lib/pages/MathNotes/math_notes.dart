@@ -7,8 +7,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hive/hive.dart';
 import 'package:latext/latext.dart';
+import 'package:odlikas_ekran/database/api/deepseek_service.dart';
 import 'package:odlikas_ekran/database/api/matpix_ai_solving.dart';
-import 'package:odlikas_ekran/database/api/open_ai_service.dart';
 import 'package:odlikas_ekran/pages/MathNotes/ImagesAdding/image_element.dart';
 import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_shape.dart';
 import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_painters.dart';
@@ -468,9 +468,9 @@ class _MathNotesState extends State<MathNotes> {
                     _openAiAnswer = null;
                   });
 
-                  final openAiService = OpenAiService();
+                  final deepSeekService = DeepseekService();
                   final openAiResult =
-                      await openAiService.solveMathExpression(sanitized);
+                      await deepSeekService.solveMathExpression(sanitized);
 
                   setState(() {
                     _isOpenAiLoading = false;

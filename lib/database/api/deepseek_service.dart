@@ -3,20 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-class OpenAiService {
-  // openai API ključ
-  final String _apiKey = dotenv.get("OPENAI_API_KEY");
+class DeepseekService {
+  // DeepSeek API key
+  final String _apiKey = dotenv.get("DEEPSEEK_API_KEY");
 
-  // metoda za rješavanje matematičkog izraza
+  // DeepSeek API endpoint
+  final String _apiEndpoint = "https://api.deepseek.com/v1/chat/completions";
+
+  // Method for solving mathematical expressions
   Future<List<Map<String, String>>?> solveMathExpression(
       String latexExpression) async {
-    final uri = Uri.parse("https://api.openai.com/v1/chat/completions");
+    final uri = Uri.parse(_apiEndpoint);
     final headers = {
       "Content-Type": "application/json",
       "Authorization": "Bearer $_apiKey",
     };
 
-    // prompt za rješavanje matematičkog izraza
+    // Prompt for solving the mathematical expression
     final messages = [
       {
         "role": "system",
@@ -80,16 +83,16 @@ class OpenAiService {
       }
     ];
 
-    // tijelo zahtjeva
+    // Request body
     final body = {
-      "model": "gpt-4-turbo",
+      "model": "deepseek-chat", // Use appropriate DeepSeek model
       "messages": messages,
       "max_tokens": 3000,
       "temperature": 0,
     };
 
     try {
-      // slanje zahtjeva
+      // Send request
       final response =
           await http.post(uri, headers: headers, body: jsonEncode(body));
       debugPrint(response.body);
@@ -100,16 +103,16 @@ class OpenAiService {
     }
   }
 
-  // Nova metoda za generiranje sličnih zadataka
+  // Method for generating similar tasks
   Future<List<Map<String, String>>?> generateSimilarTasks(
       String originalLatexExpression) async {
-    final uri = Uri.parse("https://api.openai.com/v1/chat/completions");
+    final uri = Uri.parse(_apiEndpoint);
     final headers = {
       "Content-Type": "application/json",
       "Authorization": "Bearer $_apiKey",
     };
 
-    // prompt za generiranje sličnih zadataka
+    // Prompt for generating similar tasks
     final messages = [
       {
         "role": "system",
@@ -157,16 +160,16 @@ class OpenAiService {
       }
     ];
 
-    // tijelo zahtjeva
+    // Request body
     final body = {
-      "model": "gpt-4-turbo",
+      "model": "deepseek-chat", // Use appropriate DeepSeek model
       "messages": messages,
       "max_tokens": 3000,
-      "temperature": 0.7, // malo veća temperatura za raznolikost zadataka
+      "temperature": 0.7, // Slightly higher temperature for variety
     };
 
     try {
-      // slanje zahtjeva
+      // Send request
       final response =
           await http.post(uri, headers: headers, body: jsonEncode(body));
       debugPrint(response.body);
@@ -177,7 +180,67 @@ class OpenAiService {
     }
   }
 
-  // metoda za obradu odgovora za slične zadatke
+  // Method for processing the API response
+  List<Map<String, String>>? _handleApiResponse(http.Response response) {
+    if (response.statusCode != 200) {
+      debugPrint('API Error: ${response.statusCode}');
+      return null;
+    }
+
+    try {
+      final data = jsonDecode(response.body);
+      final content = data['choices'][0]['message']['content']?.trim() ?? '';
+      return _parseContent(content);
+    } catch (e) {
+      debugPrint('Response parsing error: $e');
+      return null;
+    }
+  }
+
+  // Method for parsing the response content
+  // Method for parsing the response content
+  List<Map<String, String>>? _parseContent(String content) {
+    try {
+      // Clean the content from markdown code blocks
+      String cleanedContent = content;
+      if (content.startsWith('```')) {
+        final firstLineEnd = content.indexOf('\n');
+        if (firstLineEnd != -1) {
+          cleanedContent = content.substring(firstLineEnd + 1);
+          if (cleanedContent.endsWith('```')) {
+            cleanedContent =
+                cleanedContent.substring(0, cleanedContent.length - 3);
+          }
+        }
+      }
+
+      cleanedContent = cleanedContent.trim();
+      debugPrint('Cleaned JSON: $cleanedContent');
+
+      final jsonData =
+          jsonDecode(_sanitizeJson(cleanedContent)) as Map<String, dynamic>;
+      final steps = jsonData['steps'] as List<dynamic>;
+      final finalAnswer = jsonData['final_answer'] as String?;
+
+      final processedSteps = _processSteps(steps);
+
+      if (finalAnswer != null) {
+        processedSteps.add({
+          'step': 'Konačno rješenje',
+          'result': finalAnswer,
+          'explanation': 'Konačni rezultat zadatka'
+        });
+      }
+
+      return processedSteps;
+    } catch (e) {
+      debugPrint('Content processing failed: $e');
+      debugPrint('Raw content: $content');
+      return null;
+    }
+  }
+
+  // Method for handling the similar tasks response
   List<Map<String, String>>? _handleSimilarTasksResponse(
       http.Response response) {
     if (response.statusCode != 200) {
@@ -195,7 +258,7 @@ class OpenAiService {
     }
   }
 
-  // metoda za parsiranje sadržaja odgovora za slične zadatke
+  // Method for parsing the similar tasks content
   List<Map<String, String>>? _parseSimilarTasksContent(String content) {
     try {
       // Remove Markdown code block markers if present
@@ -237,49 +300,7 @@ class OpenAiService {
     }
   }
 
-  // metoda za obradu odgovora API-ja
-  List<Map<String, String>>? _handleApiResponse(http.Response response) {
-    if (response.statusCode != 200) {
-      debugPrint('API Error: ${response.statusCode}');
-      return null;
-    }
-
-    try {
-      final data = jsonDecode(response.body);
-      final content = data['choices'][0]['message']['content']?.trim() ?? '';
-      return _parseContent(content);
-    } catch (e) {
-      debugPrint('Response parsing error: $e');
-      return null;
-    }
-  }
-
-  // metoda za parsiranje sadržaja odgovora
-  List<Map<String, String>>? _parseContent(String content) {
-    try {
-      final jsonData =
-          jsonDecode(_sanitizeJson(content)) as Map<String, dynamic>;
-      final steps = jsonData['steps'] as List<dynamic>;
-      final finalAnswer = jsonData['final_answer'] as String?;
-
-      final processedSteps = _processSteps(steps);
-
-      if (finalAnswer != null) {
-        processedSteps.add({
-          'step': 'Konačno rješenje',
-          'result': finalAnswer,
-          'explanation': 'Konačni rezultat zadatka'
-        });
-      }
-
-      return processedSteps;
-    } catch (e) {
-      debugPrint('Content processing failed: $e');
-      return null;
-    }
-  }
-
-  // metoda za sanitizaciju JSON-a
+  // Helper methods - copied from your OpenAI service for consistency
   String _sanitizeJson(String input) {
     return input
         .replaceAll(RegExp(r'(?<!\\)\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})'), '')
@@ -287,7 +308,6 @@ class OpenAiService {
         .replaceAll(RegExp(r'\\n'), '');
   }
 
-  // metoda za obradu koraka
   List<Map<String, String>> _processSteps(List<dynamic> steps) {
     return steps.map<Map<String, String>>((step) {
       final stepData = step as Map<String, dynamic>;
@@ -299,7 +319,6 @@ class OpenAiService {
     }).toList();
   }
 
-  // metoda za čišćenje teksta od nepoznatih utf-8 znakova
   String _cleanText(String text) {
     return text
         .replaceAll(RegExp(r'\\[n"]'), '')
@@ -309,7 +328,6 @@ class OpenAiService {
         .replaceAll('Å¾', 'ž');
   }
 
-  // metoda za formatiranje LaTeX-a
   String _formatLatex(String latex) {
     return latex
         .replaceAll(RegExp(r'\$(.*?)\$'), r'\1')
@@ -321,7 +339,6 @@ class OpenAiService {
                 '\\begin{cases}${match.group(1)!.replaceAll(' ', ' \\\\ ')}\end{cases}');
   }
 
-  // metoda za predobradu LaTeX-a
   String _preprocessLatex(String latex) {
     return latex
         .replaceAll(RegExp(r'\\[(){}]'), '')

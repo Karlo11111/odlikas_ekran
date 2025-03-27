@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:lottie/lottie.dart';
-import 'package:odlikas_ekran/database/api/open_ai_service.dart';
+import 'package:odlikas_ekran/database/api/deepseek_service.dart';
+
 import 'package:odlikas_ekran/pages/SimilarTasks/similar_tasks_page.dart';
 
 class SolutionStepsPage extends StatelessWidget {
   final List<Map<String, String>> steps;
-  final String originalTask; 
+  final String originalTask;
 
   const SolutionStepsPage({
     Key? key,
     required this.steps,
-    required this.originalTask, 
+    required this.originalTask,
   }) : super(key: key);
 
   @override
@@ -223,11 +224,11 @@ class SolutionStepsPage extends StatelessWidget {
 
     try {
       // Initialize OpenAI service
-      final openAiService = OpenAiService();
+      final deepseekService = DeepseekService();
 
       // Get similar tasks
       final similarTasks =
-          await openAiService.generateSimilarTasks(originalTask);
+          await deepseekService.generateSimilarTasks(originalTask);
 
       // Close loading dialog
       Navigator.of(context).pop();
