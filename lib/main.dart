@@ -1,6 +1,9 @@
+// ignore_for_file: depend_on_referenced_packages
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:odlikas_ekran/custom_adapters.dart';
 import 'package:odlikas_ekran/pages/Calendar/calendar_page.dart';
 import 'package:odlikas_ekran/pages/Grades/grades_page.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.dart';
@@ -19,33 +22,46 @@ import 'pages/HomePage/home_page.dart';
 import 'pages/SetupPage/setup_page.dart';
 import 'pages/QRCodePage/qr_code_page.dart';
 import 'package:hive_flutter/adapters.dart';
+import 'package:path_provider/path_provider.dart' as path_provider;
 
 void main() async {
-  // inicijalizacija firebasea
+  // IMPORTANT: Initialize Flutter binding first before any platform channels
   WidgetsFlutterBinding.ensureInitialized();
+
+  // THEN get the application directory
+  final appDocumentDir = await path_provider.getApplicationDocumentsDirectory();
+
+  // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // inicijalizacija hive-a (local storage)
-  await Hive.initFlutter();
-  Hive.registerAdapter(WhiteboardDataAdapter());
-  await Hive.openBox<WhiteboardData>('whiteboards');
+  // Initialize Hive (local storage)
+  await Hive.initFlutter(appDocumentDir.path);
 
-  // varijabla za znanstevene biljeske
+  Hive.registerAdapter(WhiteboardDataAdapter());
+  Hive.registerAdapter(Uint8ListAdapter());
+
+  await Hive.openBox<WhiteboardData>(
+    'whiteboards',
+    compactionStrategy: (entries, deletedEntries) => deletedEntries > 10,
+    path: appDocumentDir.path,
+  );
+
+  // Access whiteboard box
   final whiteboardsBox = Hive.box<WhiteboardData>('whiteboards');
   whiteboardsBox.values.forEach((wb) {
     whiteboardsBox.get(wb.key);
   });
 
-  // vodoravna orijentacija na mobitelu
+  // Set landscape orientation on mobile
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
 
-  // full-screen mode
+  // Enable full-screen mode
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  // provjeri shared preferences
+  // Check shared preferences
   final prefs = await SharedPreferences.getInstance();
   final setupDone = prefs.getBool('setupDone') ?? false;
   final String screenId = prefs.getString('screenId') ?? '';

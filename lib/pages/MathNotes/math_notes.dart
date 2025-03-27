@@ -14,6 +14,7 @@ import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_shape.dart';
 import 'package:odlikas_ekran/pages/MathNotes/Shapes/shape_painters.dart';
 import 'package:odlikas_ekran/pages/MathNotes/TextAdding/text_model.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/debouncer.dart';
+import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/screenshot_manager.dart';
 import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_data.dart';
 import 'package:odlikas_ekran/pages/MathNotes/undoable_operation.dart';
 import 'package:odlikas_ekran/pages/MathNotes/widgets/color_width_indicator.dart';
@@ -208,8 +209,10 @@ class _MathNotesState extends State<MathNotes> {
   }
 
   // sejvaj objekt u hive bazu
+
   Future<void> _saveNow() async {
     try {
+      // Prepare data for saving
       _whiteboardData.lastModified = DateTime.now();
       _whiteboardData.paths =
           List<Map<String, dynamic>>.from(_paths.map((p) => p.toMap()));
@@ -221,7 +224,7 @@ class _MathNotesState extends State<MathNotes> {
       _whiteboardData.shapes =
           List<Map<String, dynamic>>.from(_shapes.map((s) => s.toMap()));
 
-      // Capture screenshot
+      // Capture screenshot with improved handling
       if (_whiteboardKey.currentContext != null &&
           _whiteboardKey.currentContext!.findRenderObject() != null) {
         try {
@@ -230,44 +233,59 @@ class _MathNotesState extends State<MathNotes> {
 
           // Wait for the UI to be stable
           await SchedulerBinding.instance.endOfFrame;
-
-          // Add a longer delay to ensure rendering is complete
           await Future.delayed(const Duration(milliseconds: 300));
 
           if (!boundary.debugNeedsPaint) {
-            final uiImage = await boundary.toImage(pixelRatio: 1.5);
+            // Lower resolution for better performance
+            final uiImage = await boundary.toImage(pixelRatio: 1.0);
             final byteData =
                 await uiImage.toByteData(format: ui.ImageByteFormat.png);
 
             if (byteData != null && byteData.lengthInBytes > 0) {
-              _whiteboardData.screenshot = byteData.buffer.asUint8List();
-              print('Screenshot captured: ${byteData.lengthInBytes} bytes');
-            } else {
-              print('Screenshot byte data is null or empty');
+              final bytes = byteData.buffer.asUint8List();
+
+              // Compress the image for better storage
+              try {
+                final img = imglib.decodeImage(bytes);
+                if (img != null) {
+                  // Use more aggressive compression for storage
+                  final compressed = imglib.encodePng(img, level: 9);
+
+                  // Save to file system instead of in Hive
+                  await ScreenshotManager.saveScreenshot(
+                      _whiteboardData.id, Uint8List.fromList(compressed));
+
+                  // Clear screenshot from Hive object
+                  _whiteboardData.screenshot = null;
+
+                  debugPrint(
+                      'Screenshot saved to file system for whiteboard: ${_whiteboardData.id}');
+                } else {
+                  // Save original bytes to file system
+                  await ScreenshotManager.saveScreenshot(
+                      _whiteboardData.id, bytes);
+                  _whiteboardData.screenshot = null;
+                }
+              } catch (compressionError) {
+                // Fallback to saving original to file system
+                await ScreenshotManager.saveScreenshot(
+                    _whiteboardData.id, bytes);
+                _whiteboardData.screenshot = null;
+                debugPrint(
+                    'Compression error: $compressionError, saved original image to file');
+              }
             }
-          } else {
-            print('Boundary still needs paint, skipping screenshot');
           }
         } catch (screenshotError) {
           debugPrint('Screenshot capture error: $screenshotError');
         }
       }
 
-      // Try to save the whiteboard data to the Hive box
+      // Save whiteboard data to Hive (without screenshot)
       try {
         await _whiteboardData.save();
         debugPrint(
             'Whiteboard saved successfully with ID: ${_whiteboardData.id}');
-
-        // Verify the save was successful
-        final savedWhiteboard = _whiteboardsBox.get(_whiteboardData.key);
-        if (savedWhiteboard != null) {
-          final hasScreenshot = savedWhiteboard.screenshot != null;
-          final screenshotLength =
-              hasScreenshot ? savedWhiteboard.screenshot!.length : 0;
-          debugPrint(
-              'Verification: Whiteboard has screenshot: $hasScreenshot (${screenshotLength} bytes)');
-        }
       } catch (saveError) {
         debugPrint('Error saving to Hive: $saveError');
 

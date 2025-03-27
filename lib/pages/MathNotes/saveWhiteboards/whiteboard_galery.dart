@@ -1,8 +1,11 @@
 // whiteboard_gallery.dart
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:odlikas_ekran/pages/MathNotes/math_notes.dart';
+import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/screenshot_manager.dart';
 import 'whiteboard_data.dart';
 
 class WhiteboardGalleryPage extends StatefulWidget {
@@ -92,7 +95,7 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.only(left: 60, top: 30),
+                  padding: const EdgeInsets.only(left: 60, top: 30, right: 60),
                   sliver: SliverGrid(
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
@@ -206,43 +209,7 @@ class _WhiteboardCard extends StatelessWidget {
               // prikazivanje slike (preview) whiteboarda
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Builder(
-                  builder: (context) {
-                    // debugging informacije
-                    final hasScreenshot = whiteboard.screenshot != null;
-                    final screenshotLength =
-                        hasScreenshot ? whiteboard.screenshot!.length : 0;
-                    debugPrint(
-                        'Whiteboard ${whiteboard.id}: has screenshot: $hasScreenshot (${screenshotLength} bytes)');
-
-                    if (hasScreenshot && screenshotLength > 0) {
-                      try {
-                        return Image.memory(
-                          whiteboard.screenshot!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            debugPrint('Error loading image: $error');
-                            return Container(
-                              color: Colors.grey[200],
-                              child: const Center(child: Text("Image Error")),
-                            );
-                          },
-                        );
-                      } catch (e) {
-                        debugPrint('Exception loading image: $e');
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Center(child: Text("Image Exception")),
-                        );
-                      }
-                    } else {
-                      return Container(
-                        color: Colors.grey[200],
-                        child: const Center(child: Text("No Preview")),
-                      );
-                    }
-                  },
-                ),
+                child: _buildPreviewImage(),
               ),
             ),
           ),
@@ -261,6 +228,64 @@ class _WhiteboardCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPreviewImage() {
+    return FutureBuilder<Uint8List?>(
+      future: ScreenshotManager.loadScreenshot(whiteboard.id),
+      builder: (context, snapshot) {
+        // First try to load from file system
+        if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.data != null &&
+            snapshot.data!.isNotEmpty) {
+          return Image.memory(
+            snapshot.data!,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildPlaceholder("Error Loading");
+            },
+          );
+        }
+
+        // If file doesn't exist, try from Hive as fallback
+        if (whiteboard.screenshot != null &&
+            whiteboard.screenshot!.isNotEmpty) {
+          try {
+            return Image.memory(
+              whiteboard.screenshot!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return _buildPlaceholder("Error Loading");
+              },
+            );
+          } catch (e) {
+            print('Error loading from Hive: $e');
+          }
+        }
+
+        // No preview available
+        return _buildPlaceholder("No Preview");
+      },
+    );
+  }
+
+  Widget _buildPlaceholder(String message) {
+    return Container(
+      color: Colors.grey[200],
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.article, size: 40, color: Colors.grey[400]),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
