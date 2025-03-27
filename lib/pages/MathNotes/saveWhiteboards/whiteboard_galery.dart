@@ -1,6 +1,6 @@
 // whiteboard_gallery.dart
 import 'dart:typed_data';
-
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -25,7 +25,8 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
   }
 
   // funkcija za kreiranje nove bilješke
-  void _createNewNote(BuildContext context) async {
+
+  Future<void> _createNewNote(BuildContext context) async {
     final newNote = WhiteboardData(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: "Nova bilješka ${DateTime.now().day}.${DateTime.now().month}",
@@ -36,7 +37,10 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
       textElements: [],
     );
 
-    // varijabla za spremanje nove bilješke
+    // Create a simple preview immediately
+    await _createDefaultPreview(newNote.id, newNote.name);
+
+    // Save to Hive
     final box = Hive.box<WhiteboardData>('whiteboards');
     final key = await box.add(newNote);
     final savedNote = box.get(key);
@@ -47,6 +51,57 @@ class _WhiteboardGalleryPageState extends State<WhiteboardGalleryPage> {
         builder: (context) => MathNotes(whiteboardData: savedNote!),
       ),
     );
+  }
+
+  Future<void> _createDefaultPreview(String whiteboardId, String name) async {
+    try {
+      // Create a simple colored rectangle
+      final ui.PictureRecorder recorder = ui.PictureRecorder();
+      final Canvas canvas = Canvas(recorder);
+
+      // Draw a nice gradient background
+      final Rect rect = Rect.fromLTWH(0, 0, 400, 300);
+      final gradient = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Colors.blue.shade50, Colors.blue.shade100],
+      );
+
+      canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
+
+      // Add text label
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: name,
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 24,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+
+      textPainter.layout(maxWidth: 350);
+      textPainter.paint(
+        canvas,
+        Offset(
+          (400 - textPainter.width) / 2,
+          (300 - textPainter.height) / 2,
+        ),
+      );
+
+      // Convert to image
+      final ui.Picture picture = recorder.endRecording();
+      final ui.Image image = await picture.toImage(400, 300);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        final bytes = byteData.buffer.asUint8List();
+        await ScreenshotManager.saveScreenshot(whiteboardId, bytes);
+      }
+    } catch (e) {
+      debugPrint('Error creating default preview: $e');
+    }
   }
 
   @override
@@ -235,17 +290,33 @@ class _WhiteboardCard extends StatelessWidget {
     return FutureBuilder<Uint8List?>(
       future: ScreenshotManager.loadScreenshot(whiteboard.id),
       builder: (context, snapshot) {
-        // First try to load from file system
-        if (snapshot.connectionState == ConnectionState.done &&
-            snapshot.data != null &&
-            snapshot.data!.isNotEmpty) {
-          return Image.memory(
-            snapshot.data!,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return _buildPlaceholder("Error Loading");
-            },
+        // First check if we're still loading
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            color: Colors.grey[100],
+            child: const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2.0,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+              ),
+            ),
           );
+        }
+
+        // Then try to load from file system
+        if (snapshot.data != null && snapshot.data!.isNotEmpty) {
+          try {
+            return Image.memory(
+              snapshot.data!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('Error displaying image: $error');
+                return _buildPlaceholder("Image Error");
+              },
+            );
+          } catch (e) {
+            debugPrint('Error rendering file image: $e');
+          }
         }
 
         // If file doesn't exist, try from Hive as fallback
@@ -260,7 +331,7 @@ class _WhiteboardCard extends StatelessWidget {
               },
             );
           } catch (e) {
-            print('Error loading from Hive: $e');
+            debugPrint('Error loading from Hive: $e');
           }
         }
 

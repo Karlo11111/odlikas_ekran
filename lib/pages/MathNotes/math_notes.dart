@@ -212,7 +212,7 @@ class _MathNotesState extends State<MathNotes> {
 
   Future<void> _saveNow() async {
     try {
-      // Prepare data for saving
+      // Prepare data for saving as before
       _whiteboardData.lastModified = DateTime.now();
       _whiteboardData.paths =
           List<Map<String, dynamic>>.from(_paths.map((p) => p.toMap()));
@@ -224,60 +224,141 @@ class _MathNotesState extends State<MathNotes> {
       _whiteboardData.shapes =
           List<Map<String, dynamic>>.from(_shapes.map((s) => s.toMap()));
 
-      // Capture screenshot with improved handling
-      if (_whiteboardKey.currentContext != null &&
-          _whiteboardKey.currentContext!.findRenderObject() != null) {
+      // New approach: manually draw everything to a canvas instead of using RepaintBoundary
+      try {
+        // Get the overall size of the whiteboard (use a reasonable default if not available)
+        final Size canvasSize =
+            _whiteboardKey.currentContext?.size ?? Size(800, 600);
+
+        // Create a recorder and canvas
+        final ui.PictureRecorder recorder = ui.PictureRecorder();
+        final Canvas canvas = Canvas(recorder);
+
+        // Fill the background with white
+        canvas.drawRect(
+          Rect.fromLTWH(0, 0, canvasSize.width, canvasSize.height),
+          Paint()..color = Colors.white,
+        );
+
+        // Apply the same transformations as in your painter
+        canvas.save();
+        canvas.transform(_transformationMatrix.storage);
+
+        // Draw all shapes
+        for (final shape in _shapes) {
+          shape.draw(canvas);
+        }
+
+        // Draw all paths
+        for (final drawingPath in _paths) {
+          final path = drawingPath.toPath();
+          final paint = Paint()
+            ..color = drawingPath.color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = drawingPath.strokeWidth
+            ..strokeCap = StrokeCap.round;
+
+          canvas.drawPath(path, paint);
+        }
+
+        // Draw the text elements - this is a simplified approach
+        final textPainter = TextPainter(
+          textDirection: TextDirection.ltr,
+        );
+
+        for (final element in _textElements) {
+          textPainter.text = TextSpan(
+            text: element.text,
+            style: TextStyle(
+              fontSize: element.fontSize,
+              color: Colors.black,
+            ),
+          );
+
+          textPainter.layout();
+          textPainter.paint(canvas, element.position);
+        }
+
+        canvas.restore();
+
+        // Convert to an image
+        final ui.Picture picture = recorder.endRecording();
+        final ui.Image image = await picture.toImage(
+          canvasSize.width.toInt(),
+          canvasSize.height.toInt(),
+        );
+
+        // Convert to PNG bytes
+        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+        if (byteData != null) {
+          final bytes = byteData.buffer.asUint8List();
+
+          // Save directly without further processing
+          await ScreenshotManager.saveScreenshot(_whiteboardData.id, bytes);
+
+          // Clear from Hive
+          _whiteboardData.screenshot = null;
+
+          debugPrint(
+              'Manual screenshot captured and saved: ${bytes.length} bytes');
+        }
+      } catch (e) {
+        debugPrint('Manual screenshot capture error: $e');
+
+        // Fallback to a very simple colored rectangle as thumbnail if everything else fails
         try {
-          final boundary = _whiteboardKey.currentContext!.findRenderObject()
-              as RenderRepaintBoundary;
+          // Draw a simple rectangle with a gradient as a fallback
+          final ui.PictureRecorder recorder = ui.PictureRecorder();
+          final Canvas canvas = Canvas(recorder);
 
-          // Wait for the UI to be stable
-          await SchedulerBinding.instance.endOfFrame;
-          await Future.delayed(const Duration(milliseconds: 300));
+          // Create a gradient background with the whiteboard's name
+          final Rect rect = Rect.fromLTWH(0, 0, 400, 300);
 
-          if (!boundary.debugNeedsPaint) {
-            // Lower resolution for better performance
-            final uiImage = await boundary.toImage(pixelRatio: 1.0);
-            final byteData =
-                await uiImage.toByteData(format: ui.ImageByteFormat.png);
+          // Use a gradient that visually indicates this is a whiteboard
+          final gradient = LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.blue.shade50, Colors.blue.shade100],
+          );
 
-            if (byteData != null && byteData.lengthInBytes > 0) {
-              final bytes = byteData.buffer.asUint8List();
+          canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
 
-              // Compress the image for better storage
-              try {
-                final img = imglib.decodeImage(bytes);
-                if (img != null) {
-                  // Use more aggressive compression for storage
-                  final compressed = imglib.encodePng(img, level: 9);
+          // Add a text label
+          final textPainter = TextPainter(
+            text: TextSpan(
+              text: _whiteboardData.name,
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 24,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          );
 
-                  // Save to file system instead of in Hive
-                  await ScreenshotManager.saveScreenshot(
-                      _whiteboardData.id, Uint8List.fromList(compressed));
+          textPainter.layout(maxWidth: 350);
+          textPainter.paint(
+            canvas,
+            Offset(
+              (400 - textPainter.width) / 2,
+              (300 - textPainter.height) / 2,
+            ),
+          );
 
-                  // Clear screenshot from Hive object
-                  _whiteboardData.screenshot = null;
+          // Convert to image
+          final ui.Picture picture = recorder.endRecording();
+          final ui.Image image = await picture.toImage(400, 300);
+          final byteData =
+              await image.toByteData(format: ui.ImageByteFormat.png);
 
-                  debugPrint(
-                      'Screenshot saved to file system for whiteboard: ${_whiteboardData.id}');
-                } else {
-                  // Save original bytes to file system
-                  await ScreenshotManager.saveScreenshot(
-                      _whiteboardData.id, bytes);
-                  _whiteboardData.screenshot = null;
-                }
-              } catch (compressionError) {
-                // Fallback to saving original to file system
-                await ScreenshotManager.saveScreenshot(
-                    _whiteboardData.id, bytes);
-                _whiteboardData.screenshot = null;
-                debugPrint(
-                    'Compression error: $compressionError, saved original image to file');
-              }
-            }
+          if (byteData != null) {
+            final bytes = byteData.buffer.asUint8List();
+            await ScreenshotManager.saveScreenshot(_whiteboardData.id, bytes);
+            _whiteboardData.screenshot = null;
+            debugPrint('Fallback thumbnail saved: ${bytes.length} bytes');
           }
-        } catch (screenshotError) {
-          debugPrint('Screenshot capture error: $screenshotError');
+        } catch (fallbackError) {
+          debugPrint('Fallback thumbnail also failed: $fallbackError');
         }
       }
 
@@ -289,14 +370,13 @@ class _MathNotesState extends State<MathNotes> {
       } catch (saveError) {
         debugPrint('Error saving to Hive: $saveError');
 
-        // Fallback: try put method if save fails
-        try {
-          if (_whiteboardData.isInBox) {
+        // Fallback to put
+        if (_whiteboardData.isInBox) {
+          try {
             await _whiteboardsBox.put(_whiteboardData.key, _whiteboardData);
-            debugPrint('Whiteboard saved with fallback put method');
+          } catch (e) {
+            debugPrint('All save attempts failed: $e');
           }
-        } catch (fallbackError) {
-          debugPrint('Fallback save also failed: $fallbackError');
         }
       }
     } catch (e, stack) {
