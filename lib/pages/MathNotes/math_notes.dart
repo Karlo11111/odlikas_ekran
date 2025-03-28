@@ -29,6 +29,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:typed_data';
 import 'package:image/image.dart' as imglib;
 import 'dart:ui' as ui;
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 class MathNotes extends StatefulWidget {
   final WhiteboardData? whiteboardData;
@@ -250,7 +251,7 @@ class _MathNotesState extends State<MathNotes> {
   // sejvaj objekt u hive bazu
   Future<void> _saveNow() async {
     try {
-      // Prepare data for saving as before
+      // Prepare data for saving
       _whiteboardData.lastModified = DateTime.now();
       _whiteboardData.paths =
           List<Map<String, dynamic>>.from(_paths.map((p) => p.toMap()));
@@ -264,166 +265,249 @@ class _MathNotesState extends State<MathNotes> {
       _whiteboardData.imageElements = List<Map<String, dynamic>>.from(
           _imageElements.map((img) => img.toMap()));
 
-      // New approach: manually draw everything to a canvas instead of using RepaintBoundary
-      try {
-        // Get the overall size of the whiteboard (use a reasonable default if not available)
-        final Size canvasSize =
-            _whiteboardKey.currentContext?.size ?? Size(800, 600);
+      // Get the overall size of the whiteboard
+      final Size canvasSize =
+          _whiteboardKey.currentContext?.size ?? const Size(800, 700);
 
-        // Create a recorder and canvas
+      // Create a recorder and canvas
+      final ui.PictureRecorder recorder = ui.PictureRecorder();
+      final Canvas canvas = Canvas(recorder);
+
+      // Fill the background with white
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, canvasSize.width, canvasSize.height),
+        Paint()..color = Colors.white,
+      );
+
+      // Apply transformations
+      canvas.save();
+      canvas.transform(_transformationMatrix.storage);
+
+      // Draw all shapes
+      for (final shape in _shapes) {
+        shape.draw(canvas);
+      }
+
+      // Draw all paths
+      for (final drawingPath in _paths) {
+        final path = drawingPath.toPath();
+        final paint = Paint()
+          ..color = drawingPath.color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = drawingPath.strokeWidth
+          ..strokeCap = StrokeCap.round;
+
+        canvas.drawPath(path, paint);
+      }
+
+      // Draw text elements
+      final textPainter = TextPainter(
+        textDirection: TextDirection.ltr,
+      );
+
+      for (final element in _textElements) {
+        textPainter.text = TextSpan(
+          text: element.text,
+          style: TextStyle(
+            fontSize: element.fontSize,
+            color: Colors.black,
+          ),
+        );
+
+        textPainter.layout();
+        textPainter.paint(canvas, element.position);
+      }
+
+      // Preload images before drawing
+      if (_imageElements.isNotEmpty) {
+        try {
+          // Cache manager to load network images
+          final cacheManager = DefaultCacheManager();
+
+          // Load all images in parallel
+          final futures = <Future<ui.Image>>[];
+          final imageMap = <String, ui.Image>{};
+
+          for (final imageElement in _imageElements) {
+            final url = imageElement.imageUrl;
+
+            final future = cacheManager.getSingleFile(url).then((file) async {
+              final bytes = await file.readAsBytes();
+              final codec = await ui.instantiateImageCodec(bytes);
+              final frame = await codec.getNextFrame();
+              imageMap[url] = frame.image;
+              return frame.image;
+            }).catchError((e) {
+              debugPrint('Error loading image: $e');
+              final recorder = ui.PictureRecorder();
+              final canvas = Canvas(recorder);
+              canvas.drawRect(
+                const Rect.fromLTWH(0, 0, 100, 100),
+                Paint()..color = Colors.grey,
+              );
+              final placeholderImage =
+                  recorder.endRecording().toImage(100, 100);
+              return placeholderImage;
+            });
+
+            futures.add(future);
+          }
+
+          // Wait for all images to load (or fail)
+          await Future.wait(futures);
+
+          // Draw all images
+          for (final imageElement in _imageElements) {
+            final image = imageMap[imageElement.imageUrl];
+            if (image != null) {
+              // Calculate the image rect based on position and size
+              final destRect = Rect.fromLTWH(
+                imageElement.position.dx,
+                imageElement.position.dy,
+                imageElement.size.width,
+                imageElement.size.height,
+              );
+
+              // Create paint with opacity
+              final paint = Paint()
+                ..filterQuality = FilterQuality.medium
+                ..isAntiAlias = true
+                ..color = Colors.white.withOpacity(imageElement.opacity);
+
+              // Handle rotation if needed
+              if (imageElement.rotation != 0.0) {
+                canvas.save();
+
+                // Translate to center, rotate, translate back
+                final center = Offset(
+                  destRect.left + destRect.width / 2,
+                  destRect.top + destRect.height / 2,
+                );
+
+                canvas.translate(center.dx, center.dy);
+                canvas.rotate(imageElement.rotation);
+                canvas.translate(-center.dx, -center.dy);
+
+                canvas.drawImageRect(
+                  image,
+                  Rect.fromLTWH(
+                      0, 0, image.width.toDouble(), image.height.toDouble()),
+                  destRect,
+                  paint,
+                );
+
+                canvas.restore();
+              } else {
+                // Draw without rotation
+                canvas.drawImageRect(
+                  image,
+                  Rect.fromLTWH(
+                      0, 0, image.width.toDouble(), image.height.toDouble()),
+                  destRect,
+                  paint,
+                );
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error processing images: $e');
+        }
+      }
+
+      // Restore canvas and create the image
+      canvas.restore();
+      final ui.Picture picture = recorder.endRecording();
+      final ui.Image image = await picture.toImage(
+        canvasSize.width.toInt(),
+        canvasSize.height.toInt(),
+      );
+
+      // Convert to PNG bytes
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData != null) {
+        final bytes = byteData.buffer.asUint8List();
+        await ScreenshotManager.saveScreenshot(_whiteboardData.id, bytes);
+        _whiteboardData.screenshot = null;
+        debugPrint(
+            'Manual screenshot captured and saved: ${bytes.length} bytes');
+      }
+    } catch (e, stack) {
+      debugPrint('Screenshot error: $e\n$stack');
+
+      // Create a fallback thumbnail
+      try {
+        // Draw a simple rectangle with a gradient as a fallback
         final ui.PictureRecorder recorder = ui.PictureRecorder();
         final Canvas canvas = Canvas(recorder);
 
-        // Fill the background with white
-        canvas.drawRect(
-          Rect.fromLTWH(0, 0, canvasSize.width, canvasSize.height),
-          Paint()..color = Colors.white,
+        // Create a gradient background with the whiteboard's name
+        final Rect rect = Rect.fromLTWH(0, 0, 400, 300);
+
+        // Use a gradient that visually indicates this is a whiteboard
+        final gradient = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.blue.shade50, Colors.blue.shade100],
         );
 
-        // Apply the same transformations as in your painter
-        canvas.save();
-        canvas.transform(_transformationMatrix.storage);
+        canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
 
-        // Draw all shapes
-        for (final shape in _shapes) {
-          shape.draw(canvas);
-        }
-
-        // Draw all paths
-        for (final drawingPath in _paths) {
-          final path = drawingPath.toPath();
-          final paint = Paint()
-            ..color = drawingPath.color
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = drawingPath.strokeWidth
-            ..strokeCap = StrokeCap.round;
-
-          canvas.drawPath(path, paint);
-        }
-
-        // Draw the text elements - this is a simplified approach
+        // Add a text label
         final textPainter = TextPainter(
+          text: TextSpan(
+            text: _whiteboardData.name,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 24,
+            ),
+          ),
           textDirection: TextDirection.ltr,
         );
 
-        for (final element in _textElements) {
-          textPainter.text = TextSpan(
-            text: element.text,
-            style: TextStyle(
-              fontSize: element.fontSize,
-              color: Colors.black,
-            ),
-          );
-
-          textPainter.layout();
-          textPainter.paint(canvas, element.position);
-        }
-
-        canvas.restore();
-
-        // Convert to an image
-        final ui.Picture picture = recorder.endRecording();
-        final ui.Image image = await picture.toImage(
-          canvasSize.width.toInt(),
-          canvasSize.height.toInt(),
+        textPainter.layout(maxWidth: 350);
+        textPainter.paint(
+          canvas,
+          Offset(
+            (400 - textPainter.width) / 2,
+            (300 - textPainter.height) / 2,
+          ),
         );
 
-        // Convert to PNG bytes
+        // Convert to image
+        final ui.Picture picture = recorder.endRecording();
+        final ui.Image image = await picture.toImage(400, 300);
         final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
         if (byteData != null) {
           final bytes = byteData.buffer.asUint8List();
-
-          // Save directly without further processing
           await ScreenshotManager.saveScreenshot(_whiteboardData.id, bytes);
-
-          // Clear from Hive
           _whiteboardData.screenshot = null;
-
-          debugPrint(
-              'Manual screenshot captured and saved: ${bytes.length} bytes');
+          debugPrint('Fallback thumbnail saved: ${bytes.length} bytes');
         }
-      } catch (e) {
-        debugPrint('Manual screenshot capture error: $e');
+      } catch (fallbackError) {
+        debugPrint('Fallback thumbnail also failed: $fallbackError');
+      }
+    }
 
-        // Fallback to a very simple colored rectangle as thumbnail if everything else fails
+    // Save whiteboard data to Hive (without screenshot)
+    try {
+      await _whiteboardData.save();
+      debugPrint(
+          'Whiteboard saved successfully with ID: ${_whiteboardData.id}');
+    } catch (saveError) {
+      debugPrint('Error saving to Hive: $saveError');
+
+      // Fallback to put
+      if (_whiteboardData.isInBox) {
         try {
-          // Draw a simple rectangle with a gradient as a fallback
-          final ui.PictureRecorder recorder = ui.PictureRecorder();
-          final Canvas canvas = Canvas(recorder);
-
-          // Create a gradient background with the whiteboard's name
-          final Rect rect = Rect.fromLTWH(0, 0, 400, 300);
-
-          // Use a gradient that visually indicates this is a whiteboard
-          final gradient = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.blue.shade50, Colors.blue.shade100],
-          );
-
-          canvas.drawRect(rect, Paint()..shader = gradient.createShader(rect));
-
-          // Add a text label
-          final textPainter = TextPainter(
-            text: TextSpan(
-              text: _whiteboardData.name,
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 24,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          );
-
-          textPainter.layout(maxWidth: 350);
-          textPainter.paint(
-            canvas,
-            Offset(
-              (400 - textPainter.width) / 2,
-              (300 - textPainter.height) / 2,
-            ),
-          );
-
-          // Convert to image
-          final ui.Picture picture = recorder.endRecording();
-          final ui.Image image = await picture.toImage(400, 300);
-          final byteData =
-              await image.toByteData(format: ui.ImageByteFormat.png);
-
-          if (byteData != null) {
-            final bytes = byteData.buffer.asUint8List();
-            await ScreenshotManager.saveScreenshot(_whiteboardData.id, bytes);
-            _whiteboardData.screenshot = null;
-            debugPrint('Fallback thumbnail saved: ${bytes.length} bytes');
-          }
-        } catch (fallbackError) {
-          debugPrint('Fallback thumbnail also failed: $fallbackError');
+          await _whiteboardsBox.put(_whiteboardData.key, _whiteboardData);
+        } catch (e) {
+          debugPrint('All save attempts failed: $e');
         }
       }
-
-      // Save whiteboard data to Hive (without screenshot)
-      try {
-        await _whiteboardData.save();
-        debugPrint(
-            'Whiteboard saved successfully with ID: ${_whiteboardData.id}');
-      } catch (saveError) {
-        debugPrint('Error saving to Hive: $saveError');
-
-        // Fallback to put
-        if (_whiteboardData.isInBox) {
-          try {
-            await _whiteboardsBox.put(_whiteboardData.key, _whiteboardData);
-          } catch (e) {
-            debugPrint('All save attempts failed: $e');
-          }
-        }
-      }
-    } catch (e, stack) {
-      debugPrint('Save error: $e\n$stack');
     }
   }
-
   // ----------------------------------------------------------
   //     SELECTANJE SLIKE ZA MATHPIX AI
   // ----------------------------------------------------------

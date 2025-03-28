@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
@@ -18,7 +20,39 @@ class SolutionStepsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget _buildStepCard(Map<String, String> step, int index) {
+    // Improve the step card builder to handle overflow
+    Widget buildStepCard(Map<String, String> step, int index) {
+      final result = step['result'] ?? '';
+      final explanation = _betterDiacriticsFix(
+          step['explanation'] ?? 'Nema dostupnog objašnjenja');
+
+      // Check specifically for currency-based final answers (most common issue)
+      bool isNumericWithKuna =
+          RegExp(r'^\s*\d+(\.\d+)?\s*(kn|kuna|Kn|Kuna)\s*').hasMatch(result);
+
+      Widget resultWidget;
+
+      if (isNumericWithKuna) {
+        // For simple currency results, use regular Text
+        resultWidget = Text(
+          _betterDiacriticsFix(result),
+          style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w600),
+        );
+      } else {
+        // For everything else, use Math.tex
+        resultWidget = SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Math.tex(
+            _fixMultiplicationSymbols(result),
+            textStyle: GoogleFonts.inter(fontSize: 30),
+            onErrorFallback: (err) => Text(
+              result, // On error, just show the raw result
+              style: GoogleFonts.inter(fontSize: 30),
+            ),
+          ),
+        );
+      }
+
       return Container(
         decoration: BoxDecoration(
           border: Border(
@@ -33,14 +67,7 @@ class SolutionStepsPage extends StatelessWidget {
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
-            title: Math.tex(
-              _fixMultiplicationSymbols(step['result'] ?? ''),
-              textStyle: GoogleFonts.inter(fontSize: 30),
-              onErrorFallback: (err) => Text(
-                _cleanRawLatex(step['result'] ?? ''),
-                style: GoogleFonts.inter(fontSize: 30),
-              ),
-            ),
+            title: resultWidget,
             trailing: Icon(
               Icons.keyboard_arrow_down,
               color: Colors.orange[800],
@@ -51,8 +78,7 @@ class SolutionStepsPage extends StatelessWidget {
                 color: Colors.white,
                 width: double.infinity,
                 child: Text(
-                  _betterDiacriticsFix(
-                      step['step'] ?? 'Nema dostupnog objašnjenja'),
+                  explanation,
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     color: Colors.grey[800],
@@ -108,7 +134,7 @@ class SolutionStepsPage extends StatelessWidget {
                     child: ListView.builder(
                       itemCount: steps.length,
                       itemBuilder: (context, index) =>
-                          _buildStepCard(steps[index], index),
+                          buildStepCard(steps[index], index),
                     ),
                   ),
                 ),
@@ -143,22 +169,39 @@ class SolutionStepsPage extends StatelessWidget {
                         ),
                         const Spacer(),
                         const Spacer(),
+                        // Fix for the final solution display with scroll
                         Center(
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  spreadRadius: 1,
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            child: Math.tex(
-                              _fixMultiplicationSymbols(lastResult),
-                              textStyle: GoogleFonts.inter(
-                                fontSize: 58,
-                                color: Colors.black,
-                              ),
-                              onErrorFallback: (err) => Text(
-                                _cleanRawLatex(lastResult),
-                                style: GoogleFonts.inter(fontSize: 58),
+                            constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.45,
+                            ),
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.of(context).size.width * 0.55,
+                                ),
+                                child: _buildFinalAnswer(
+                                    _betterDiacriticsFix(lastResult)),
                               ),
                             ),
                           ),
@@ -201,6 +244,101 @@ class SolutionStepsPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // In your SolutionStepsPage class, modify how you display the final answer
+  Widget _buildFinalAnswer(String result) {
+    // Check if this is a math expression (has LaTeX commands or math symbols)
+    bool isLaTeX =
+        result.contains(r'\') || result.contains(r'=') || result.contains(r'^');
+
+    // Check if it has plain text (letters other than common math variables)
+    bool hasText = result.contains(RegExp(r'[a-zA-ZčćšđžČĆŠĐŽ]{3,}'));
+
+    if (isLaTeX && hasText) {
+      // It has both math and text - try to separate them
+
+      // First, extract any LaTeX expressions within the string
+      final mathExpressions = <String>[];
+      final textParts = <String>[];
+
+      // Simple split by common text indicators
+      List<String> parts = result.split('-');
+      if (parts.length <= 1) {
+        parts = result.split(':');
+      }
+
+      if (parts.length > 1) {
+        // We have some natural separation in the text
+        for (final part in parts) {
+          if (part.contains(r'\') ||
+              (part.contains(RegExp(r'\d')) &&
+                  !part.contains(RegExp(r'[a-zA-ZčćšđžČĆŠĐŽ]{3,}')))) {
+            // This part is likely math
+            mathExpressions.add(part.trim());
+          } else {
+            // This part is likely text
+            textParts.add(part.trim());
+          }
+        }
+      } else {
+        // No obvious separator - just display with Math.tex and let user see
+        // the fallback if it fails
+        return Math.tex(
+          result,
+          textStyle: GoogleFonts.inter(fontSize: 58),
+          onErrorFallback: (err) => Text(
+            result,
+            style: GoogleFonts.inter(fontSize: 58),
+          ),
+        );
+      }
+
+      // Build the UI with separated parts
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Math parts
+          if (mathExpressions.isNotEmpty)
+            ...mathExpressions.map((expr) => Math.tex(
+                  expr,
+                  textStyle: GoogleFonts.inter(fontSize: 58),
+                  onErrorFallback: (err) => Text(
+                    expr,
+                    style: GoogleFonts.inter(fontSize: 58),
+                  ),
+                )),
+
+          const SizedBox(height: 10),
+
+          // Text parts
+          if (textParts.isNotEmpty)
+            ...textParts.map((text) => Text(
+                  text,
+                  style: GoogleFonts.inter(fontSize: 24, color: Colors.black87),
+                  textAlign: TextAlign.center,
+                )),
+        ],
+      );
+    }
+
+    // If it's just a formula or just text, handle appropriately
+    if (isLaTeX) {
+      return Math.tex(
+        result,
+        textStyle: GoogleFonts.inter(fontSize: 58),
+        onErrorFallback: (err) => Text(
+          result,
+          style: GoogleFonts.inter(fontSize: 58),
+        ),
+      );
+    } else {
+      return Text(
+        result,
+        style: GoogleFonts.inter(fontSize: 44),
+        textAlign: TextAlign.center,
+      );
+    }
   }
 
   // Nova metoda za učitavanje sličnih zadataka
@@ -266,7 +404,7 @@ class SolutionStepsPage extends StatelessWidget {
     }
   }
 
-  // Original methods - kept exactly as they were
+  // Original methods - kept exactly as they were, but added improvement for explanation handling
   String _fixMultiplicationSymbols(String latex) {
     return latex.replaceAllMapped(RegExp(r'( cdot )'), (match) => r'\times');
   }
@@ -286,10 +424,10 @@ class SolutionStepsPage extends StatelessWidget {
 
     // Direct character replacements for Croatian letters
     final Map<String, String> replacements = {
-      'Ä': 'č',
+      'Ä': 'ć',
       'Å¡': 'š',
       'Å¾': 'ž',
-      'Ä‡': 'ć',
+      'Ä‡': 'č',
     };
 
     // Apply replacements
