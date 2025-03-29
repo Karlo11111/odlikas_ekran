@@ -1,3 +1,5 @@
+// lib/pages/UploadFiles/uploaded_files.dart
+
 // ignore_for_file: unused_field
 
 import 'package:flutter/material.dart';
@@ -5,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:odlikas_ekran/pages/UploadFiles/pdf_page_selector.dart';
 
 class UploadFilesPages extends StatefulWidget {
   final Function(String imageUrl)? onImageSelected;
@@ -131,6 +134,29 @@ class _UploadFilesPagesState extends State<UploadFilesPages> {
     }
   }
 
+  void _handlePdfSelection(String fileUrl, String fileName) {
+    if (widget.onImageSelected == null) {
+      return; // If no handler is provided, just return
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PdfPageSelector(
+          pdfUrl: fileUrl,
+          fileName: fileName,
+          onPagesSelected: (List<String> imageUrls) {
+            // Handle each converted image URL
+            for (final imageUrl in imageUrls) {
+              widget.onImageSelected!(imageUrl);
+            }
+            // No need to call Navigator.pop() here as the selector will handle it
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -210,13 +236,16 @@ class _UploadFilesPagesState extends State<UploadFilesPages> {
                     final fileName = file['name'] ?? 'N/A';
                     final fileUrl = file['url'] ?? '';
 
-                    // Check if it's an image (simple check based on extension)
+                    // Check if it's an image or PDF
                     final bool isImage = _isImageFile(fileName);
+                    final bool isPdf = _isPdfFile(fileName);
 
                     return InkWell(
                       onTap: () {
                         if (isImage) {
                           _handleImageSelection(fileUrl);
+                        } else if (isPdf) {
+                          _handlePdfSelection(fileUrl, fileName);
                         }
                       },
                       child: Column(
@@ -244,13 +273,21 @@ class _UploadFilesPagesState extends State<UploadFilesPages> {
                                       );
                                     },
                                   )
-                                : const Center(
-                                    child: Icon(
-                                      Icons.picture_as_pdf,
-                                      size: 40,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
+                                : isPdf
+                                    ? const Center(
+                                        child: Icon(
+                                          Icons.picture_as_pdf,
+                                          size: 40,
+                                          color: Colors.red,
+                                        ),
+                                      )
+                                    : const Center(
+                                        child: Icon(
+                                          Icons.insert_drive_file,
+                                          size: 40,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -278,5 +315,10 @@ class _UploadFilesPagesState extends State<UploadFilesPages> {
         lowerCaseName.endsWith('.png') ||
         lowerCaseName.endsWith('.gif') ||
         lowerCaseName.endsWith('.webp');
+  }
+
+  bool _isPdfFile(String fileName) {
+    final lowerCaseName = fileName.toLowerCase();
+    return lowerCaseName.endsWith('.pdf');
   }
 }
