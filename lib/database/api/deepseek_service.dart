@@ -49,7 +49,7 @@ class DeepseekService {
       // Send request with timeout
       final response = await http
           .post(uri, headers: headers, body: jsonEncode(body))
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 60));
 
       debugPrint('DeepSeek API response status: ${response.statusCode}');
 

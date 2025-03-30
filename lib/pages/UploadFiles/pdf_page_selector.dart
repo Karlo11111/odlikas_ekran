@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:pdf_render/pdf_render.dart';
 import 'package:pdf_render/pdf_render_widgets.dart';
+import 'package:image/image.dart' as imglib;
 
 class PdfPageSelector extends StatefulWidget {
   final String pdfUrl;
@@ -104,6 +105,7 @@ class _PdfPageSelectorState extends State<PdfPageSelector> {
     });
   }
 
+  // Fixed _convertSelectedPagesToImages() function in pdf_page_selector.dart
   Future<void> _convertSelectedPagesToImages() async {
     setState(() {
       _isLoading = true;
@@ -114,20 +116,39 @@ class _PdfPageSelectorState extends State<PdfPageSelector> {
       final tempDir = await getTemporaryDirectory();
 
       for (final pageIndex in _selectedPages) {
-        // Render the page to an image
+        // Render the page to an image with higher resolution
         final page = await _pdfDocument.getPage(pageIndex + 1);
+
+        // Use higher resolution for better quality - multiply by 2 for retina-quality
+        final width = (page.width * 2).toInt();
+        final height = (page.height * 2).toInt();
+
         final pageImage = await page.render(
-          width: (page.width * 2).toInt(),
-          height: (page.height * 2).toInt(),
+          width: width,
+          height: height,
         );
 
-        // Get image data directly from pixels property
+        // Get the image file path
         final imagePath =
             '${tempDir.path}/pdf_page_${widget.fileName.replaceAll(' ', '_')}_$pageIndex.png';
         final imageFile = File(imagePath);
 
-        // Write the pixels directly to the file
-        await imageFile.writeAsBytes(pageImage.pixels);
+        // Convert to PNG bytes - in 1.4.7 pixels is a Uint8List of RGBA values
+        final bytes = pageImage.pixels;
+
+        // Create a properly encoded PNG from the RGBA pixel data
+        final imglib.Image image = imglib.Image.fromBytes(
+          width: pageImage.width,
+          height: pageImage.height,
+          bytes: bytes.buffer,
+          numChannels: 4, // RGBA
+        );
+
+        // Use the image package to encode as PNG
+        final pngBytes = imglib.encodePng(image);
+
+        // Write the PNG data to file
+        await imageFile.writeAsBytes(pngBytes);
 
         // Add the file path as a URL (using file:// protocol)
         _convertedImageUrls.add('file://$imagePath');
@@ -137,7 +158,14 @@ class _PdfPageSelectorState extends State<PdfPageSelector> {
       widget.onPagesSelected(_convertedImageUrls);
 
       // Return to previous screen
-      Navigator.of(context).pop();
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context); // Pop the PDF selector
+
+        // This is the key change - we're ensuring we get back to the MathNotes screen
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context); // Pop the UploadFilesPage too
+        }
+      }
     } catch (e) {
       debugPrint('Error converting PDF pages: $e');
       setState(() {
@@ -179,7 +207,7 @@ class _PdfPageSelectorState extends State<PdfPageSelector> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          "Odaberi PDF stranice",
+          "Odaberi stranice PDF-a",
           style: GoogleFonts.inter(
             fontSize: 28,
             fontWeight: FontWeight.w600,
@@ -247,68 +275,74 @@ class _PdfPageSelectorState extends State<PdfPageSelector> {
 
                         return GestureDetector(
                           onTap: () => _togglePageSelection(index),
-                          child: Stack(
+                          child: Column(
                             children: [
-                              // PDF page preview
+                              // Page number indicator above the preview
                               Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                margin: const EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? Colors.blue
-                                        : Colors.grey[300]!,
-                                    width: isSelected ? 3 : 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(8),
+                                  color:
+                                      isSelected ? Colors.blue : Colors.black54,
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                clipBehavior: Clip.antiAlias,
-                                child: PdfPageView(
-                                  pdfDocument: _pdfDocument,
-                                  pageNumber: index + 1,
-                                ),
-                              ),
-
-                              // Page number indicator
-                              Positioned(
-                                bottom: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black54,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    "Stranica ${index + 1}",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
+                                child: Text(
+                                  "Stranica ${index + 1}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
 
-                              // Selection indicator
-                              if (isSelected)
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.blue,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.check,
-                                        color: Colors.white,
-                                        size: 16,
+                              // PDF page preview with selection indicator
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    // PDF page preview
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? Colors.blue
+                                              : Colors.grey[300]!,
+                                          width: isSelected ? 3 : 1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: PdfPageView(
+                                        pdfDocument: _pdfDocument,
+                                        pageNumber: index + 1,
                                       ),
                                     ),
-                                  ),
+
+                                    // Selection indicator
+                                    if (isSelected)
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.blue,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.check,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
+                              ),
                             ],
                           ),
                         );

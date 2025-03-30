@@ -1,6 +1,7 @@
 // ignore_for_file: prefer_final_fields, unused_field, depend_on_referenced_packages, library_private_types_in_public_api, deprecated_member_use, avoid_print, unused_local_variable
 
 import 'dart:ui';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -227,12 +228,15 @@ class _MathNotesState extends State<MathNotes> {
 
     final transformedCenter = _transformPoint(center);
 
+    // Make images take up more screen space
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
     final newImage = ImageElement(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       imageUrl: imageUrl,
       position: transformedCenter,
-      size: const Size(
-          300, 200), // Default size - can be adjusted based on screen size
+      size: Size(screenWidth * 3.6, screenHeight * 3.6),
     );
 
     setState(() {
@@ -246,6 +250,65 @@ class _MathNotesState extends State<MathNotes> {
     });
 
     _autoSave();
+  }
+
+  Widget imageWidget(String imageUrl, Size size) {
+    if (imageUrl.startsWith('file://')) {
+      // Local file (likely from PDF conversion)
+      final filePath = imageUrl.replaceFirst('file://', '');
+      return Image.file(
+        File(filePath),
+        width: size.width,
+        height: size.height,
+        fit: BoxFit.contain, // Use contain to preserve aspect ratio
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('Error displaying local image: $error');
+          return Container(
+            color: Colors.grey[200],
+            child: const Center(
+              child: Icon(
+                Icons.broken_image,
+                size: 40,
+                color: Colors.grey,
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      // Network image
+      return Image.network(
+        imageUrl,
+        width: size.width,
+        height: size.height,
+        fit: BoxFit.contain, // Use contain to preserve aspect ratio
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            color: Colors.grey[200],
+            child: const Center(
+              child: Icon(
+                Icons.broken_image,
+                size: 40,
+                color: Colors.grey,
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 
   // sejvaj objekt u hive bazu
@@ -331,26 +394,39 @@ class _MathNotesState extends State<MathNotes> {
           for (final imageElement in _imageElements) {
             final url = imageElement.imageUrl;
 
-            final future = cacheManager.getSingleFile(url).then((file) async {
-              final bytes = await file.readAsBytes();
-              final codec = await ui.instantiateImageCodec(bytes);
-              final frame = await codec.getNextFrame();
-              imageMap[url] = frame.image;
-              return frame.image;
-            }).catchError((e) {
-              debugPrint('Error loading image: $e');
-              final recorder = ui.PictureRecorder();
-              final canvas = Canvas(recorder);
-              canvas.drawRect(
-                const Rect.fromLTWH(0, 0, 100, 100),
-                Paint()..color = Colors.grey,
-              );
-              final placeholderImage =
-                  recorder.endRecording().toImage(100, 100);
-              return placeholderImage;
-            });
+            // Handle local file path images (from PDF)
+            if (url.startsWith('file://')) {
+              final filePath = url.replaceFirst('file://', '');
+              final file = File(filePath);
+              if (await file.exists()) {
+                final bytes = await file.readAsBytes();
+                final codec = await ui.instantiateImageCodec(bytes);
+                final frame = await codec.getNextFrame();
+                imageMap[url] = frame.image;
+                futures.add(Future.value(frame.image));
+              } else {
+                debugPrint('Local file does not exist: $filePath');
+                // Add a placeholder image
+                final placeholderFuture = _createPlaceholderImage();
+                futures.add(placeholderFuture);
+                placeholderFuture.then((image) => imageMap[url] = image);
+              }
+            }
+            // Handle network images
+            else {
+              final future = cacheManager.getSingleFile(url).then((file) async {
+                final bytes = await file.readAsBytes();
+                final codec = await ui.instantiateImageCodec(bytes);
+                final frame = await codec.getNextFrame();
+                imageMap[url] = frame.image;
+                return frame.image;
+              }).catchError((e) {
+                debugPrint('Error loading image: $e');
+                return _createPlaceholderImage();
+              });
 
-            futures.add(future);
+              futures.add(future);
+            }
           }
 
           // Wait for all images to load (or fail)
@@ -507,6 +583,17 @@ class _MathNotesState extends State<MathNotes> {
         }
       }
     }
+  }
+
+  Future<ui.Image> _createPlaceholderImage() async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawRect(
+      const Rect.fromLTWH(0, 0, 100, 100),
+      Paint()..color = Colors.grey,
+    );
+    final picture = recorder.endRecording();
+    return await picture.toImage(100, 100);
   }
   // ----------------------------------------------------------
   //     SELECTANJE SLIKE ZA MATHPIX AI
@@ -769,50 +856,59 @@ class _MathNotesState extends State<MathNotes> {
                       }
 
                       if (!clickedOnExistingText && !clickedOnExistingImage) {
-                        // Add a new text element only if we didn't click on an existing element
-                        // Get current scale (zoom in/out)
-                        final double scale =
-                            _transformationMatrix.getMaxScaleOnAxis();
-
-                        // Base sizes for text
-                        const double baseWidth = 150.0;
-                        const double baseHeight = 50.0;
-                        const double baseFontSize = 24.0;
-
-                        // Calculate size and position based on current scale
-                        final double adjustedWidth = baseWidth / scale;
-                        final double adjustedHeight = baseHeight / scale;
-                        final double adjustedFontSize = baseFontSize / scale;
-
-                        // Create new text element with scale-determined positions and sizes
-                        final newElement = TextElement(
-                          id: DateTime.now().microsecondsSinceEpoch.toString(),
-                          position: _transformPoint(details.localPosition),
-                          fontSize: adjustedFontSize,
-                          size: Size(adjustedWidth, adjustedHeight),
-                          isEditing: true,
-                        );
-
-                        setState(() {
-                          // If there's a selected text element, deselect it
-                          if (_selectedTextElement != null) {
+                        // If we already have a selected text element but clicked elsewhere,
+                        // deselect it and switch to hand tool instead of creating a new one
+                        if (_selectedTextElement != null) {
+                          setState(() {
                             if (_selectedTextElement!.isEditing) {
                               _selectedTextElement!.isEditing = false;
                             }
-                          }
+                            _selectedTextElement = null;
+                            _currentTool = ToolMode.hand; // Switch to hand tool
+                            // Dismiss keyboard
+                            FocusManager.instance.primaryFocus?.unfocus();
+                          });
+                        } else {
+                          // Only create new text if there wasn't already a text selected
+                          // Get current scale (zoom in/out)
+                          final double scale =
+                              _transformationMatrix.getMaxScaleOnAxis();
 
-                          // Deselect any selected image when adding text
-                          if (_selectedImageElement != null) {
-                            _selectedImageElement = null;
-                          }
+                          // Base sizes for text
+                          const double baseWidth = 150.0;
+                          const double baseHeight = 50.0;
+                          const double baseFontSize = 24.0;
 
-                          _textElements.add(newElement);
-                          _recordAction(UndoableAction(
-                            type: ActionType.addText,
-                            item: newElement,
-                          ));
-                          _selectedTextElement = newElement;
-                        });
+                          // Calculate size and position based on current scale
+                          final double adjustedWidth = baseWidth / scale;
+                          final double adjustedHeight = baseHeight / scale;
+                          final double adjustedFontSize = baseFontSize / scale;
+
+                          // Create new text element with scale-determined positions and sizes
+                          final newElement = TextElement(
+                            id: DateTime.now()
+                                .microsecondsSinceEpoch
+                                .toString(),
+                            position: _transformPoint(details.localPosition),
+                            fontSize: adjustedFontSize,
+                            size: Size(adjustedWidth, adjustedHeight),
+                            isEditing: true,
+                          );
+
+                          setState(() {
+                            // Deselect any selected image when adding text
+                            if (_selectedImageElement != null) {
+                              _selectedImageElement = null;
+                            }
+
+                            _textElements.add(newElement);
+                            _recordAction(UndoableAction(
+                              type: ActionType.addText,
+                              item: newElement,
+                            ));
+                            _selectedTextElement = newElement;
+                          });
+                        }
                       }
                     } else {
                       // For all other tools, check if we're clicking on any elements
@@ -871,6 +967,19 @@ class _MathNotesState extends State<MathNotes> {
 
                         if (elementRect.contains(details.localPosition)) {
                           clickedOnExistingImage = true;
+                          setState(() {
+                            // Deselect any selected text
+                            if (_selectedTextElement != null) {
+                              if (_selectedTextElement!.isEditing) {
+                                _selectedTextElement!.isEditing = false;
+                              }
+                              _selectedTextElement = null;
+                            }
+
+                            // Select this image
+                            _selectedImageElement = element;
+                            _currentTool = ToolMode.image;
+                          });
                           break;
                         }
                       }
@@ -1022,42 +1131,7 @@ class _MathNotesState extends State<MathNotes> {
                             ),
                             child: Opacity(
                               opacity: element.opacity,
-                              child: Image.network(
-                                element.imageUrl,
-                                width: scaledSize.width,
-                                height: scaledSize.height,
-                                fit: BoxFit.cover,
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                                  if (loadingProgress == null) {
-                                    return child;
-                                  }
-                                  return Center(
-                                    child: CircularProgressIndicator(
-                                      value:
-                                          loadingProgress.expectedTotalBytes !=
-                                                  null
-                                              ? loadingProgress
-                                                      .cumulativeBytesLoaded /
-                                                  loadingProgress
-                                                      .expectedTotalBytes!
-                                              : null,
-                                    ),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.broken_image,
-                                        size: 40,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                              child: imageWidget(element.imageUrl, scaledSize),
                             ),
                           ),
 
@@ -1225,6 +1299,7 @@ class _MathNotesState extends State<MathNotes> {
                               : null,
                         ),
                         child: Stack(
+                          clipBehavior: Clip.none,
                           children: [
                             // editanje texta
                             if (element.isEditing)
@@ -1257,6 +1332,47 @@ class _MathNotesState extends State<MathNotes> {
                                 ),
                               ),
 
+                            if (_selectedTextElement == element)
+                              Positioned(
+                                right: -10,
+                                top: -10,
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    setState(() {
+                                      final index =
+                                          _textElements.indexOf(element);
+                                      if (index != -1) {
+                                        final removedText =
+                                            _textElements.removeAt(index);
+                                        _recordAction(UndoableAction(
+                                          type: ActionType.deleteText,
+                                          item: removedText,
+                                          index: index,
+                                        ));
+                                        _selectedTextElement = null;
+                                        _currentTool = ToolMode.hand;
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.white, width: 2),
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
                             // rucka za resizanje
                             if (_selectedTextElement == element)
                               Positioned(
@@ -1282,13 +1398,18 @@ class _MathNotesState extends State<MathNotes> {
                                     });
                                   },
                                   child: Container(
-                                    width: 30,
-                                    height: 30,
+                                    width: 50,
+                                    height: 50,
                                     decoration: BoxDecoration(
                                       color: Colors.blue,
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                           color: Colors.white, width: 2),
+                                    ),
+                                    child: const Icon(
+                                      Icons.open_with,
+                                      color: Colors.white,
+                                      size: 16,
                                     ),
                                   ),
                                 ),

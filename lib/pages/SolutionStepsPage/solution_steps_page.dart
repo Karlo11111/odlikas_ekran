@@ -100,7 +100,7 @@ class SolutionStepsPage extends StatelessWidget {
         children: [
           // Header Section
           Padding(
-            padding: const EdgeInsets.only(top: 25, left: 16, right: 16),
+            padding: const EdgeInsets.only(top: 25, left: 16, right: 56),
             child: Row(
               children: [
                 IconButton(
@@ -248,91 +248,102 @@ class SolutionStepsPage extends StatelessWidget {
 
   // In your SolutionStepsPage class, modify how you display the final answer
   Widget _buildFinalAnswer(String result) {
-    // Check if this is a math expression (has LaTeX commands or math symbols)
-    bool isLaTeX =
-        result.contains(r'\') || result.contains(r'=') || result.contains(r'^');
+    // Function to check if content is primarily LaTeX math
+    bool isPrimarilyLaTeX(String text) {
+      // Math symbols and operations that indicate LaTeX content
+      final mathSymbols = RegExp(r'[=<>≤≥≈±×÷⋅∙√∛∜∫∬∮∯∰∱∲∳∑∏∐⊕⊗⊙⊛⊝⊞⊟⊠⊡∕]');
+      final latexCommands = RegExp(r'\\[a-zA-Z]+|\\[^a-zA-Z]');
+      final fractions = RegExp(r'\\frac');
+      final displayStyle = RegExp(r'\\displaystyle');
 
-    // Check if it has plain text (letters other than common math variables)
-    bool hasText = result.contains(RegExp(r'[a-zA-ZčćšđžČĆŠĐŽ]{3,}'));
+      // Check for these indicators
+      bool hasLatexCommands = latexCommands.hasMatch(text);
+      bool hasMathSymbols = mathSymbols.hasMatch(text);
+      bool hasFractions = fractions.hasMatch(text);
+      bool hasDisplayStyle = displayStyle.hasMatch(text);
 
-    if (isLaTeX && hasText) {
-      // It has both math and text - try to separate them
+      // If it has any specific LaTeX indicators, consider it primarily LaTeX
+      return hasLatexCommands ||
+          hasFractions ||
+          hasDisplayStyle ||
+          hasMathSymbols;
+    }
 
-      // First, extract any LaTeX expressions within the string
-      final mathExpressions = <String>[];
-      final textParts = <String>[];
+    // Check if the result contains any LaTeX indicators
+    bool isLaTeX = isPrimarilyLaTeX(result);
 
-      // Simple split by common text indicators
-      List<String> parts = result.split('-');
-      if (parts.length <= 1) {
-        parts = result.split(':');
+    // Check if content contains multiple lines (which might need special handling)
+    bool hasMultipleLines = result.contains('\n') || result.contains('\\\\');
+
+    // Special cases for equations
+    bool isSimpleEquation = result.contains('=') && !result.contains('\n');
+
+    if (isSimpleEquation) {
+      // For simple equations, make sure we're using LaTeX rendering
+      // Sometimes these don't get the proper LaTeX formatting from the API
+
+      // Remove any existing LaTeX delimiters if present
+      String cleanResult =
+          result.replaceAll(r'$$', '').replaceAll(r'$', '').trim();
+
+      // Wrap with displaystyle to ensure it's rendered properly on one line
+      if (!cleanResult.contains(r'\displaystyle')) {
+        cleanResult = r'\displaystyle ' + cleanResult;
       }
 
-      if (parts.length > 1) {
-        // We have some natural separation in the text
-        for (final part in parts) {
-          if (part.contains(r'\') ||
-              (part.contains(RegExp(r'\d')) &&
-                  !part.contains(RegExp(r'[a-zA-ZčćšđžČĆŠĐŽ]{3,}')))) {
-            // This part is likely math
-            mathExpressions.add(part.trim());
-          } else {
-            // This part is likely text
-            textParts.add(part.trim());
-          }
-        }
-      } else {
-        // No obvious separator - just display with Math.tex and let user see
-        // the fallback if it fails
-        return Math.tex(
-          result,
-          textStyle: GoogleFonts.inter(fontSize: 58),
-          onErrorFallback: (err) => Text(
+      return Math.tex(
+        cleanResult,
+        textStyle: GoogleFonts.inter(fontSize: 58),
+        onErrorFallback: (err) {
+          // print("LaTeX rendering error: $err for content: $cleanResult");
+          return Text(
             result,
             style: GoogleFonts.inter(fontSize: 58),
-          ),
-        );
-      }
-
-      // Build the UI with separated parts
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Math parts
-          if (mathExpressions.isNotEmpty)
-            ...mathExpressions.map((expr) => Math.tex(
-                  expr,
-                  textStyle: GoogleFonts.inter(fontSize: 58),
-                  onErrorFallback: (err) => Text(
-                    expr,
-                    style: GoogleFonts.inter(fontSize: 58),
-                  ),
-                )),
-
-          const SizedBox(height: 10),
-
-          // Text parts
-          if (textParts.isNotEmpty)
-            ...textParts.map((text) => Text(
-                  text,
-                  style: GoogleFonts.inter(fontSize: 24, color: Colors.black87),
-                  textAlign: TextAlign.center,
-                )),
-        ],
+          );
+        },
       );
     }
 
-    // If it's just a formula or just text, handle appropriately
     if (isLaTeX) {
+      // Clean up the content and ensure proper LaTeX formatting
+      String cleanResult = result.trim();
+
+      // Remove existing LaTeX delimiters if present, we'll add our own
+      cleanResult =
+          cleanResult.replaceAll(r'$$', '').replaceAll(r'$', '').trim();
+
+      if (hasMultipleLines) {
+        // For multi-line equations, use align environment
+        if (!cleanResult.contains(r'\begin{align}') &&
+            !cleanResult.contains(r'\begin{aligned}')) {
+          // Replace newlines with proper LaTeX line breaks
+          cleanResult = cleanResult
+              .split('\n')
+              .map((line) => line.trim())
+              .where((line) => line.isNotEmpty)
+              .join(r' \\ ');
+
+          // Wrap in align environment
+          cleanResult = r'\begin{aligned} ' + cleanResult + r' \end{aligned}';
+        }
+      } else if (!cleanResult.contains(r'\displaystyle')) {
+        // Add displaystyle for better rendering of single-line equations
+        cleanResult = r'\displaystyle ' + cleanResult;
+      }
+
       return Math.tex(
-        result,
+        cleanResult,
         textStyle: GoogleFonts.inter(fontSize: 58),
-        onErrorFallback: (err) => Text(
-          result,
-          style: GoogleFonts.inter(fontSize: 58),
-        ),
+        onErrorFallback: (err) {
+          // print("LaTeX rendering error: $err for content: $cleanResult");
+          return Text(
+            result,
+            style: GoogleFonts.inter(fontSize: 58),
+          );
+        },
       );
     } else {
+      // For plain text
       return Text(
         result,
         style: GoogleFonts.inter(fontSize: 44),
