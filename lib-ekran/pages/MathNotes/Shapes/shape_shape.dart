@@ -1,7 +1,9 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:odlikas_ekran/pages/MathNotes/math_notes.dart';
+import 'package:odlikas_ekran/pages/MathNotes/Core/types.dart';
 
 // klasa modela oblika za whiteboard
 class ShapeShape {

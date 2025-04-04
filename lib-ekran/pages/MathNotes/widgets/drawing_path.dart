@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:odlikas_ekran/pages/MathNotes/Core/types.dart';
 
 // klasa za crtanje putanje pomocu CustomPainter-a
 class DrawingPath {
@@ -70,6 +71,3 @@ class DrawingPath {
     );
   }
 }
-
-// enumeracija za nacin crtanja
-enum DrawingMode { pen, marker, eraser }
