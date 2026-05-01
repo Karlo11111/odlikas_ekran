@@ -1,175 +1,174 @@
-# Odlikas Ekran
+# Odlikas Screen
 
-Flutter aplikacija za tablet/ekran za studente Tehničkog veleučilišta u Zagrebu (TVZ) koja se sparuje s mobilnom aplikacijom Odlikas putem QR koda i pruža prošireno sučelje na drugom zaslonu — optimizirano za landscape format.
+Flutter tablet/screen app for students at the Technical University of Zagreb (TVZ) that pairs with the Odlikas mobile app via QR code and provides an extended interface on a secondary display — optimised for landscape format.
 
-## Funkcionalnosti
+## Features
 
-- **Ocjene** — pregled trenutnih ocjena po predmetu s detaljnim tablicama vrednovanja i grafičkim prikazom
-- **Kalendar** — osobni kalendar s prikazom nadolazećih rokova i mogućnošću kreiranja događaja
-- **MathNotes** — digitalna ploča za crtanje i pisanje matematičkih zadataka s AI rješavanjem (DeepSeek + Mathpix OCR), undo/redo, oblicima, tekstom i uvozom slika; bilješke se automatski spremaju u galeriju
-- **Pomodoro** — ugrađeni Pomodoro tajmer (25/5/15 min) s praćenjem sesija i niza dana putem backend API-ja, dnevni limit od 8 sesija i optimistično ažuriranje
-- **Obaveze** — popis zadataka s dodavanjem i praćenjem statusa
-- **Datoteke** — pregled i odabir stranica PDF materijala
+- **Grades** — view current grades by subject with detailed scoring tables and visual grade wheel
+- **Calendar** — personal calendar with upcoming deadlines and custom event creation
+- **MathNotes** — digital whiteboard for handwriting and drawing math problems with AI solving (DeepSeek + Mathpix OCR), undo/redo, shapes, text and image import; notes auto-saved to a gallery
+- **Pomodoro** — built-in Pomodoro timer (25/5/15 min) with session and streak tracking via the backend API, daily cap of 8 sessions and optimistic updates
+- **To-Do** — task list with creation and status tracking
+- **Files** — PDF viewer with page selection
 
-## Sparivanje s mobilnom aplikacijom
+## Pairing with the Mobile App
 
-Ekran prikazuje QR kod koji student skenira mobilnom aplikacijom. Nakon skeniranja, ekran dobiva Bearer token koji se pohranjuje u Hive i koristi za sve daljnje API pozive prema Odlikas backendu.
+The screen displays a QR code that the student scans with the Odlikas mobile app. After scanning, the screen receives a Bearer token which is stored in Hive and used for all subsequent API calls to the Odlikas backend.
 
-## Tehnologije
+## Tech Stack
 
-| Sloj | Tehnologija |
+| Layer | Technology |
 |---|---|
-| UI | Flutter (Dart), landscape način rada |
-| Upravljanje stanjem | Provider + ChangeNotifier |
-| REST API | `http` paket s Bearer token autentifikacijom (token iz Hive) |
-| Autentifikacija | QR kod sparivanje → JWT token pohranjen u Hive |
-| AI (MathNotes) | DeepSeek API (rješavanje zadataka) + Mathpix (OCR) |
-| Baza podataka u oblaku | Cloud Firestore |
-| Lokalna pohrana | Hive |
-| Animacije | Lottie |
-| Sučelje | Google Fonts, flutter_svg, flutter_math_fork, LaTeX prikaz |
+| UI | Flutter (Dart), landscape mode |
+| State management | Provider + ChangeNotifier |
+| REST API | `http` package with Bearer token auth (token from Hive) |
+| Authentication | QR code pairing → JWT token stored in Hive |
+| AI (MathNotes) | DeepSeek API (problem solving) + Mathpix (OCR) |
+| Cloud database | Cloud Firestore |
+| Local storage | Hive |
+| Animations | Lottie |
 
-## Struktura projekta
+## Project Structure
 
 ```
 lib/
-├── main.dart                        # Ulazna točka, routing, MultiProvider setup
-├── responsive.dart                  # Pomoćne klase za responzivnost
-├── custom_adapters.dart             # Hive adapteri (WhiteboardData, Uint8List)
+├── main.dart                        # App entry point, routing, MultiProvider setup
+├── responsive.dart                  # Responsive layout utilities
+├── custom_adapters.dart             # Hive adapters (WhiteboardData, Uint8List)
 ├── exceptions/
-│   └── app_exceptions.dart          # Tipizirana klasa ApiException
+│   └── app_exceptions.dart          # Typed ApiException class
 ├── models/
-│   ├── grades.dart                  # Modeli ocjena i predmeta
-│   ├── specific_subject.dart        # Detalji specifičnog predmeta
-│   ├── student_profile.dart         # Profil studenta
-│   ├── task.dart                    # Model zadatka (ToDoList)
-│   └── tests.dart                   # Model testova i rokova
+│   ├── grades.dart                  # Grade and subject models
+│   ├── specific_subject.dart        # Subject detail model
+│   ├── student_profile.dart         # Student profile model
+│   ├── task.dart                    # Task model (ToDoList)
+│   └── tests.dart                   # Test and deadline models
 ├── viewmodels/
-│   ├── viewmodel.dart               # HomePageViewModel (ocjene, profil)
-│   └── test_viewmodel.dart          # TestViewmodel (testovi)
+│   ├── viewmodel.dart               # HomePageViewModel (grades, profile)
+│   └── test_viewmodel.dart          # TestViewmodel (tests)
 ├── database/
 │   ├── api/
-│   │   ├── api_service.dart         # HTTP servis (ocjene, profil, testovi)
+│   │   ├── api_service.dart         # HTTP service (grades, profile, tests)
 │   │   ├── pomodoro_api_service.dart # Pomodoro API (GetStreak, CompleteSession)
-│   │   ├── deepseek_service.dart    # DeepSeek AI servis
-│   │   └── matpix_ai_solving.dart   # Mathpix OCR servis
-│   ├── firebase_pomodoro_service.dart # Firestore Pomodoro sinkronizacija
-│   ├── task_service.dart            # Firestore servis za zadatke
+│   │   ├── deepseek_service.dart    # DeepSeek AI service
+│   │   └── matpix_ai_solving.dart   # Mathpix OCR service
+│   ├── firebase_pomodoro_service.dart # Firestore Pomodoro sync
+│   ├── task_service.dart            # Firestore task service
 │   └── firebase_options.dart
 └── pages/
-    ├── SetupPage/                   # Početno postavljanje ekrana
-    ├── QRCodePage/                  # QR kod za sparivanje s mobilnom aplikacijom
-    ├── HomePage/                    # Glavna nadzorna ploča (4 kvadranta)
+    ├── SetupPage/                   # Initial screen setup
+    ├── QRCodePage/                  # QR code for pairing with mobile app
+    ├── HomePage/                    # Main dashboard (4-quadrant layout)
     │   └── widgets/
-    │       └── grade_wheel.dart     # Grafički prikaz ocjene
-    ├── Grades/                      # Popis ocjena po predmetima
-    ├── SpecificSubject/             # Detalji predmeta, tablice i bilješke
-    ├── Calendar/                    # Kalendar s događajima
-    ├── ToDoList/                    # Popis obaveza
-    ├── PomodoroTimer/               # Pomodoro tajmer
-    │   ├── pomodoro_notifier.dart   # Stanje tajmera (ChangeNotifier)
-    │   ├── pomodoro_timer_page.dart # UI stranica
+    │       └── grade_wheel.dart     # Visual grade display
+    ├── Grades/                      # Subject grades list
+    ├── SpecificSubject/             # Subject detail with grades and notes
+    ├── Calendar/                    # Calendar with events
+    ├── ToDoList/                    # Task list
+    ├── PomodoroTimer/               # Pomodoro timer
+    │   ├── pomodoro_notifier.dart   # Timer state (ChangeNotifier)
+    │   ├── pomodoro_timer_page.dart # UI page
     │   └── widgets/
-    │       ├── pomodoro_container.dart  # Tajmer prikaz i gumbi
-    │       └── session_circles.dart    # 8 krugova dnevnih sesija
-    ├── MathNotes/                   # AI matematička ploča
-    │   ├── math_notes.dart          # Glavna ploča
-    │   ├── Core/                    # Tipovi i stanje ploče
-    │   ├── Managers/                # Crtanje, tekst, slike, oblici, AI, pohrana
-    │   ├── Shapes/                  # Oblici i painter klase
-    │   ├── TextAdding/              # Dodavanje teksta
-    │   ├── ImagesAdding/            # Dodavanje slika
-    │   ├── saveWhiteboards/         # Hive pohrana i galerija bilješki
-    │   └── widgets/                 # Alatna traka i UI komponente
-    ├── SimilarTasks/                # Prikaz sličnih zadataka
-    ├── SolutionStepsPage/           # Koraci rješenja AI zadataka
-    └── UploadFiles/                 # Pregled i odabir stranica PDF-a
+    │       ├── pomodoro_container.dart  # Timer display and buttons
+    │       └── session_circles.dart    # 8 daily session circles
+    ├── MathNotes/                   # AI math whiteboard
+    │   ├── math_notes.dart          # Main whiteboard
+    │   ├── Core/                    # Types and whiteboard state
+    │   ├── Managers/                # Drawing, text, image, shape, AI, storage managers
+    │   ├── Shapes/                  # Shape definitions and painters
+    │   ├── TextAdding/              # Text element
+    │   ├── ImagesAdding/            # Image element
+    │   ├── saveWhiteboards/         # Hive persistence and gallery
+    │   └── widgets/                 # Toolbar and UI components
+    ├── SimilarTasks/                # Similar AI-generated tasks
+    ├── SolutionStepsPage/           # Step-by-step AI solution display
+    └── UploadFiles/                 # PDF viewer and page selector
 ```
 
-## Pokretanje projekta
+## Getting Started
 
-### Preduvjeti
+### Prerequisites
 
 - Flutter SDK `^3.5.3`
 - Dart SDK `^3.5.3`
-- Android Studio ili VS Code s Flutter ekstenzijom
-- Android tablet ili emulator
-- Pristup Odlikas backend API-ju
-- Mobilna aplikacija Odlikas za sparivanje
+- Android Studio or VS Code with the Flutter extension
+- Android tablet or emulator
+- Access to the Odlikas backend API
+- Odlikas mobile app for pairing
 
-### Postavljanje
+### Setup
 
-1. **Kloniranje repozitorija**
+1. **Clone the repository**
    ```bash
    git clone <repo-url>
    cd odlikas_ekran
    ```
 
-2. **Instalacija ovisnosti**
+2. **Install dependencies**
    ```bash
    flutter pub get
    ```
 
-3. **Konfiguracija varijabli okoline**
+3. **Configure environment variables**
 
-   Kreiraj `.env` datoteku u korijenu projekta (pored `pubspec.yaml`):
+   Create a `.env` file in the project root (next to `pubspec.yaml`):
    ```env
-   API_BASE_URL=http://<ip-adresa-backenda>:<port>
-   DEEPSEEK_API_KEY=tvoj_deepseek_api_kljuc
-   MATHPIX_APP_ID=tvoj_mathpix_app_id
-   MATHPIX_APP_KEY=tvoj_mathpix_app_key
+   API_BASE_URL=http://<backend-ip>:<port>
+   DEEPSEEK_API_KEY=your_deepseek_api_key
+   MATHPIX_APP_ID=your_mathpix_app_id
+   MATHPIX_APP_KEY=your_mathpix_app_key
    ```
 
-   > `.env` datoteka je navedena u `.gitignore` i **nikada se ne smije commitati**.
+   > The `.env` file is listed in `.gitignore` and **must never be committed**.
 
-4. **Postavljanje Firebasea**
+4. **Firebase setup**
 
-   Datoteka `google-services.json` (Android) potrebna je za Firebase funkcionalnosti. Kontaktiraj člana tima — nije pohranjena u repozitoriju.
+   The `google-services.json` file (Android) is required for Firebase features. Contact a team member to obtain it — it is not stored in the repository.
 
-5. **Pokretanje aplikacije**
+5. **Run the app**
    ```bash
    flutter run
    ```
 
-   Aplikacija se automatski postavlja u landscape način rada i skriva sistemsku traku (immersive sticky).
+   The app automatically locks to landscape orientation and enables immersive sticky mode.
 
-### Pokretanje testova
+### Running tests
 
 ```bash
 flutter test
 ```
 
-### Statička analiza koda
+### Static analysis
 
 ```bash
 flutter analyze
 ```
 
-## Tok autentifikacije
+## Authentication Flow
 
-1. Ekran generira i prikazuje QR kod koji sadrži jedinstveni `screenId`
-2. Student skenira QR kod mobilnom aplikacijom Odlikas
-3. Backend veže `screenId` uz studentov račun i vraća Bearer token
-4. Token se pohranjuje u Hive (`user_credentials` box, ključ `token`)
-5. Svi daljnji API pozivi (`ApiService`, `PomodoroApiService`) automatski čitaju token iz Hive i dodaju ga u `Authorization: Bearer` zaglavlje
+1. The screen generates and displays a QR code containing a unique `screenId`
+2. The student scans the QR code with the Odlikas mobile app
+3. The backend ties the `screenId` to the student's account and returns a Bearer token
+4. The token is stored in Hive (`user_credentials` box, key `token`)
+5. All subsequent API calls (`ApiService`, `PomodoroApiService`) read the token from Hive and attach it as an `Authorization: Bearer` header
 
-## Varijable okoline
+## Environment Variables
 
-| Varijabla | Opis |
+| Variable | Description |
 |---|---|
-| `API_BASE_URL` | Osnovna URL adresa Odlikas ASP.NET backend API-ja |
-| `DEEPSEEK_API_KEY` | DeepSeek API ključ za AI rješavanje matematičkih zadataka |
-| `MATHPIX_APP_ID` | Mathpix App ID za OCR prepoznavanje matematičkih izraza |
-| `MATHPIX_APP_KEY` | Mathpix App Key za OCR prepoznavanje matematičkih izraza |
+| `API_BASE_URL` | Base URL of the Odlikas ASP.NET backend API |
+| `DEEPSEEK_API_KEY` | DeepSeek API key for AI math problem solving |
+| `MATHPIX_APP_ID` | Mathpix App ID for math OCR |
+| `MATHPIX_APP_KEY` | Mathpix App Key for math OCR |
 
-Osjetljive vrijednosti nikada nisu hardkodirane. Sve tajne učitavaju se iz `.env` datoteke pri pokretanju.
+Sensitive values are never hardcoded. All secrets are loaded from the `.env` file at startup.
 
-## Doprinos projektu
+## Contributing
 
-1. Odvoji granu od `main` za nove značajke: `git checkout -b feature/naziv-znacajke`
-2. Koristi konvencionalne commit poruke: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`
-3. Otvori pull request prema `main`
+1. Branch off `main` for new features: `git checkout -b feature/feature-name`
+2. Use conventional commit messages: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`
+3. Open a pull request against `main`
 
-## Tim
+## Team
 
-Razvija tim **Odlikas** za Mc2 natjecanje.
+Built by the **Odlikas** team for the Mc2 competition.
