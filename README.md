@@ -1,6 +1,6 @@
 # Odlikas Screen
 
-Flutter tablet/screen app for students at the Technical University of Zagreb (TVZ) that pairs with the Odlikas mobile app via QR code and provides an extended interface on a secondary display — optimised for landscape format.
+Flutter tablet/screen app — a companion for the Odlikas mobile app for the Croatian national e-grade system E-Dnevnik. Pairs with the mobile app via QR code and provides an extended interface on a secondary display, optimised for landscape format.
 
 ## Features
 
