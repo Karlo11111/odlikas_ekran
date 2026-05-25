@@ -35,40 +35,43 @@ class AiManager {
   }
 
   Future<void> handleSelectionEnd() async {
-    if (state.selectionStart != null && state.selectionEnd != null) {
+    if (state.selectionStart == null || state.selectionEnd == null) return;
+
+    try {
+      // Capture while coordinates are still set
+      final image = await _captureSelectedArea();
+
+      // Hide the selection overlay immediately — don't wait for network calls
+      state.isSelectingArea = false;
+      state.selectionStart = null;
+      state.selectionEnd = null;
+
+      if (image == null) return;
+
+      state.capturedImage = image;
+      state.isOpenAiLoading = true;
+      state.openAiAnswer = null;
+
       try {
-        final image = await _captureSelectedArea();
-        if (image != null) {
-          state.capturedImage = image;
+        final result = await _mathpixAiSolving.sendImageToMathpix(image);
+        if (result != null) {
+          final sanitized =
+              result.replaceAll(r"\(", r"$$").replaceAll(r"\)", r"$$");
+          state.latexResult = sanitized;
 
-          // Send image to mathpix
-          final result = await _mathpixAiSolving.sendImageToMathpix(image);
-          if (result != null) {
-            // Process result for display
-            String sanitized =
-                result.replaceAll(r"\(", r"$$").replaceAll(r"\)", r"$$");
-
-            state.latexResult = sanitized;
-
-            // Start loading the AI solution
-            state.isOpenAiLoading = true;
-            state.openAiAnswer = null;
-
-            try {
-              final openAiResult =
-                  await _deepseekService.solveMathExpression(sanitized);
-              state.openAiAnswer = openAiResult;
-            } finally {
-              state.isOpenAiLoading = false;
-            }
-          }
+          final openAiResult =
+              await _deepseekService.solveMathExpression(sanitized);
+          state.openAiAnswer = openAiResult;
         }
       } finally {
-        // Reset selection state
-        state.isSelectingArea = false;
-        state.selectionStart = null;
-        state.selectionEnd = null;
+        state.isOpenAiLoading = false;
       }
+    } catch (e) {
+      state.isSelectingArea = false;
+      state.selectionStart = null;
+      state.selectionEnd = null;
+      state.isOpenAiLoading = false;
+      print('AI processing error: $e');
     }
   }
 

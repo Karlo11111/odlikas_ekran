@@ -20,8 +20,8 @@ class TransformationManager {
   void handleScaleUpdate(ScaleUpdateDetails details) {
     if (state.currentTool != ToolMode.hand) return;
 
-    if (details.scale != 1.0) {
-      // Zoom scaling
+    if (details.pointerCount > 1) {
+      // Pinch-to-zoom with simultaneous pan support
       final newScale = state.lastScale * details.scale;
       final clampedScale = newScale.clamp(MIN_SCALE, MAX_SCALE);
 
@@ -34,20 +34,25 @@ class TransformationManager {
 
       final scaleDelta = clampedScale / state.lastScale;
 
-      state.transformationMatrix =
-          Matrix4.copy(state.initialTransformationMatrix)
-            ..translate(transformedFocal.dx, transformedFocal.dy)
-            ..scale(scaleDelta)
-            ..translate(-transformedFocal.dx, -transformedFocal.dy);
+      final newMatrix = Matrix4.copy(state.initialTransformationMatrix)
+        ..translate(transformedFocal.dx, transformedFocal.dy)
+        ..scale(scaleDelta)
+        ..translate(-transformedFocal.dx, -transformedFocal.dy);
 
+      // Account for focal point movement (panning while pinching)
+      final focalDelta =
+          details.localFocalPoint - state.initialGestureFocalPoint;
+      newMatrix.translate(
+          focalDelta.dx / clampedScale, focalDelta.dy / clampedScale);
+
+      state.transformationMatrix = newMatrix;
       state.currentScale = clampedScale;
     } else {
-      // Panning
+      // Single-finger pan — mutate then reassign through setter to trigger notifyListeners
       final delta = details.focalPointDelta;
-      state.transformationMatrix.translate(
-        delta.dx / state.currentScale,
-        delta.dy / state.currentScale,
-      );
+      final m = state.transformationMatrix;
+      m.translate(delta.dx / state.currentScale, delta.dy / state.currentScale);
+      state.transformationMatrix = m;
     }
   }
 
@@ -74,23 +79,19 @@ class TransformationManager {
 
     if (focalPoint != null) {
       final deltaScale = clampedScale / state.currentScale;
-
-      state.transformationMatrix
+      final newMatrix = Matrix4.copy(state.transformationMatrix)
         ..translate(focalPoint.dx, focalPoint.dy)
         ..scale(deltaScale)
         ..translate(-focalPoint.dx, -focalPoint.dy);
+      state.transformationMatrix = newMatrix;
     } else {
-      // Center zoom
-      final oldMatrix = Matrix4.copy(state.transformationMatrix);
-      final translation = oldMatrix.getTranslation();
-
-      state.transformationMatrix = Matrix4.identity();
-      state.transformationMatrix.scale(clampedScale);
-
-      // Keep the center point invariant
+      // Center zoom — preserve translation proportionally
       final ratio = clampedScale / state.currentScale;
-      final adjustedTranslation = translation.scaled(ratio);
-      state.transformationMatrix.setTranslation(adjustedTranslation);
+      final translation =
+          Matrix4.copy(state.transformationMatrix).getTranslation();
+      final newMatrix = Matrix4.identity()..scale(clampedScale);
+      newMatrix.setTranslation(translation.scaled(ratio));
+      state.transformationMatrix = newMatrix;
     }
 
     state.currentScale = clampedScale;

@@ -144,19 +144,19 @@ class _MathNotesState extends State<MathNotes> {
     switch (_state.currentTool) {
       case ToolMode.hand:
         _transformationManager.handleScaleUpdate(details);
+        // No autosave during pan/zoom — save once on gesture end
         break;
       case ToolMode.pen:
         _drawingManager.handleDrawingUpdate(details);
+        _storageManager.autoSave();
         break;
       case ToolMode.shape:
         _shapeManager.handleShapeUpdate(details);
+        _storageManager.autoSave();
         break;
       default:
         break;
     }
-
-    // Trigger autosave after scale update
-    _storageManager.autoSave();
   }
 
   void _handleScaleEnd(ScaleEndDetails details) {
@@ -468,11 +468,11 @@ class _MathNotesState extends State<MathNotes> {
           if (_state.isOpenAiLoading)
             Positioned(
               bottom: 16,
-              left: MediaQuery.of(context).size.width / 2 - 200,
+              left: MediaQuery.of(context).size.width / 2 - 250,
               child: Container(
-                width: 400,
-                constraints: const BoxConstraints(maxHeight: 220),
-                padding: const EdgeInsets.all(16),
+                width: 500,
+                constraints: const BoxConstraints(maxHeight: 260),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -487,17 +487,15 @@ class _MathNotesState extends State<MathNotes> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_state.latexResult != null)
+                    if (_state.latexResult != null) ...[
                       Flexible(
                         child: SingleChildScrollView(
-                          child: Text(
-                            _state.latexResult!,
-                            textAlign: TextAlign.left,
-                            style: GoogleFonts.inter(fontSize: 16),
-                          ),
+                          scrollDirection: Axis.horizontal,
+                          child: _buildLatexPreview(_state.latexResult!),
                         ),
                       ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 16),
+                    ],
                     Image.asset(
                       'assets/animations/spinning_circle.gif',
                       width: 60,
@@ -809,6 +807,15 @@ class _MathNotesState extends State<MathNotes> {
         ),
       );
     }).toList();
+  }
+
+  Widget _buildLatexPreview(String raw) {
+    return LaTexT(
+      laTeXCode: Text(
+        raw,
+        style: GoogleFonts.inter(fontSize: 22),
+      ),
+    );
   }
 
   final BoxDecoration _panelDecoration = BoxDecoration(
