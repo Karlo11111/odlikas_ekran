@@ -42,3 +42,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# AI agent artifacts
+.claude/
+memory/
+
+# Binary archives (use GitHub Releases or Git LFS instead)
+*.zip
