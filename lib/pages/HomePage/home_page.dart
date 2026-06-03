@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
+import 'package:odlikas_ekran/constants/app_colors.dart';
 import 'package:odlikas_ekran/exceptions/app_exceptions.dart';
 import 'package:odlikas_ekran/pages/HomePage/widgets/grade_wheel.dart';
 import 'package:odlikas_ekran/responsive.dart';
@@ -99,7 +101,6 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final viewModel = context.watch<HomePageViewModel>();
 
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: viewModel.isLoading
@@ -128,90 +129,94 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 )
-          : viewModel.grades != null
-              ? Center(
-                  child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Positioned(
-                      left: MediaQuery.of(context).size.width * 0.02,
-                      top: MediaQuery.of(context).size.height * 0.02,
-                      child: InkWell(
-                        onTap: () => Navigator.pushNamed(context, '/todo'),
-                        child: _buildContainer(
-                          label: "POPIS OBVEZA",
-                          width: MediaQuery.of(context).size.width * 0.47,
-                          height: MediaQuery.of(context).size.height * 0.463,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: MediaQuery.of(context).size.width * 0.02,
-                      bottom: MediaQuery.of(context).size.height * 0.02,
-                      child: InkWell(
-                        onTap: () =>
-                            Navigator.pushNamed(context, '/calendar'),
-                        child: _buildContainer(
-                          label: "KALENDAR",
-                          width: MediaQuery.of(context).size.width * 0.47,
-                          height: MediaQuery.of(context).size.height * 0.463,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: MediaQuery.of(context).size.width * 0.02,
-                      top: MediaQuery.of(context).size.height * 0.02,
-                      child: InkWell(
-                        onTap: () =>
-                            Navigator.pushNamed(context, '/pomodoro'),
-                        child: _buildContainer(
-                          label: "POMODORO \nMJERAČ VREMENA",
-                          width: MediaQuery.of(context).size.width * 0.47,
-                          height: MediaQuery.of(context).size.height * 0.463,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: MediaQuery.of(context).size.width * 0.02,
-                      bottom: MediaQuery.of(context).size.height * 0.02,
-                      child: InkWell(
-                        onTap: () =>
-                            Navigator.pushNamed(context, '/photomath'),
-                        child: _buildContainer(
-                          label: "ZNANSTVENE BILJEŠKE",
-                          width: MediaQuery.of(context).size.width * 0.47,
-                          height: MediaQuery.of(context).size.height * 0.463,
-                        ),
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: Align(
-                        alignment: Alignment.center,
-                        child: GestureDetector(
-                          onTap: () =>
-                              Navigator.pushNamed(context, '/grades'),
-                          child: Container(
-                            width:
-                                MediaQuery.of(context).size.width * 0.25,
-                            height:
-                                MediaQuery.of(context).size.width * 0.25,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Theme.of(context)
-                                  .scaffoldBackgroundColor,
-                            ),
-                            child: ClipOval(
-                              child: GradeWheel(
-                                  subjects:
-                                      viewModel.grades?.subjects ?? []),
+              : viewModel.grades != null
+                  ? Center(
+                      child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Positioned(
+                          left: MediaQuery.of(context).size.width * 0.02,
+                          top: MediaQuery.of(context).size.height * 0.02,
+                          child: InkWell(
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/leaderboard'),
+                            child: _buildContainer(
+                              label: "LJESTVICA",
+                              width: MediaQuery.of(context).size.width * 0.47,
+                              height:
+                                  MediaQuery.of(context).size.height * 0.463,
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ))
-              : const Center(),
+                        Positioned(
+                          left: MediaQuery.of(context).size.width * 0.02,
+                          bottom: MediaQuery.of(context).size.height * 0.02,
+                          child: InkWell(
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/calendar'),
+                            child: _buildContainer(
+                              label: "KALENDAR",
+                              width: MediaQuery.of(context).size.width * 0.47,
+                              height:
+                                  MediaQuery.of(context).size.height * 0.463,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: MediaQuery.of(context).size.width * 0.02,
+                          top: MediaQuery.of(context).size.height * 0.02,
+                          child: InkWell(
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/pomodoro'),
+                            child: _buildContainer(
+                              label: "POMODORO \nMJERAČ VREMENA",
+                              width: MediaQuery.of(context).size.width * 0.47,
+                              height:
+                                  MediaQuery.of(context).size.height * 0.463,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          right: MediaQuery.of(context).size.width * 0.02,
+                          bottom: MediaQuery.of(context).size.height * 0.02,
+                          child: InkWell(
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/photomath'),
+                            child: _buildContainer(
+                              label: "BILJEŠKE",
+                              width: MediaQuery.of(context).size.width * 0.47,
+                              height:
+                                  MediaQuery.of(context).size.height * 0.463,
+                            ),
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: Align(
+                            alignment: Alignment.center,
+                            child: GestureDetector(
+                              onTap: () =>
+                                  Navigator.pushNamed(context, '/grades'),
+                              child: Container(
+                                width: MediaQuery.of(context).size.width * 0.25,
+                                height:
+                                    MediaQuery.of(context).size.width * 0.25,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color:
+                                      Theme.of(context).scaffoldBackgroundColor,
+                                ),
+                                child: ClipOval(
+                                  child: GradeWheel(
+                                      subjects:
+                                          viewModel.grades?.subjects ?? []),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ))
+                  : const Center(),
     );
   }
 
@@ -235,8 +240,8 @@ class _HomePageState extends State<HomePage> {
         child: Text(
           label,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color.fromRGBO(113, 113, 113, 1),
+          style: GoogleFonts.inter(
+            color: AppColors.secondary,
             fontSize: 32,
             fontWeight: FontWeight.w600,
           ),

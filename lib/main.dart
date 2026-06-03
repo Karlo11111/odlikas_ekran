@@ -11,7 +11,7 @@ import 'package:odlikas_ekran/pages/MathNotes/saveWhiteboards/whiteboard_galery.
 import 'package:odlikas_ekran/database/api/pomodoro_api_service.dart';
 import 'package:odlikas_ekran/pages/PomodoroTimer/pomodoro_notifier.dart';
 import 'package:odlikas_ekran/pages/PomodoroTimer/pomodoro_timer_page.dart';
-import 'package:odlikas_ekran/pages/ToDoList/todo_list.dart';
+import 'package:odlikas_ekran/pages/Ljestvica/ljestvica_page.dart';
 import 'package:odlikas_ekran/pages/UploadFiles/uploaded_files.dart';
 import 'package:odlikas_ekran/viewmodels/test_viewmodel.dart';
 import 'package:provider/provider.dart';
@@ -127,7 +127,7 @@ class MyApp extends StatelessWidget {
           '/calendar': (context) => const CalendarPage(),
           '/pomodoro': (context) => const PomodoroTimerPage(),
           '/photomath': (context) => const WhiteboardGalleryPage(),
-          '/todo': (context) => const TodoList(),
+          '/leaderboard': (context) => const LjestvicaPage(),
           "/files": (context) => const UploadFilesPages(),
         },
       ),
