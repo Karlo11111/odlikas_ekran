@@ -10,6 +10,7 @@ Flutter tablet/screen app — a companion for the Odlikas mobile app for the Cro
 - **Pomodoro** — built-in Pomodoro timer (25/5/15 min) with session and streak tracking via the backend API, daily cap of 8 sessions and optimistic updates
 - **To-Do** — task list with creation and status tracking
 - **Files** — PDF viewer with page selection
+- **Ljestvica** — school leaderboard showing top students by grade delta and Pomodoro streak score, with class, school and programme rankings
 
 ## Pairing with the Mobile App
 
@@ -143,6 +144,27 @@ flutter test
 ```bash
 flutter analyze
 ```
+
+### CI/CD
+
+A GitHub Actions workflow runs on every push and pull request to `main`. It installs dependencies, runs static analysis, and executes the full test suite. See `.github/workflows/ci.yml`.
+
+## Tests
+
+Unit tests live in `odlikas_ekran/test/`. Run them with:
+
+```bash
+flutter test
+```
+
+| Suite | Coverage |
+|---|---|
+| `exceptions/` | All custom exception types (`RateLimitException`, `AuthException`, `ApiException`) |
+| `models/` | JSON parsing for `Task`, `Grades`, `StudentProfile`, `Tests`, `SubjectDetails` — including missing-field fallbacks and roundtrip serialization |
+| `services/leaderboard_entry_test` | `LeaderboardEntry.fromJson` — type coercion (int → double), optional fields, zero scores |
+| `viewmodels/recommendation_viewmodel_test` | Date filtering logic — within-14-day window, past/future/today exclusion, invalid date handling, result ordering |
+
+---
 
 ## Authentication Flow
 
