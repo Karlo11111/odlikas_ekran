@@ -34,7 +34,7 @@ class Subject {
       subjectName: json['subjectName'] ?? '',
       grade: json['grade'] ?? 'N/A',
       subjectId: json['subjectId'] ?? '',
-      professor: json['professor'] ?? 0,
+      professor: json['professor'] ?? '',
     );
   }
 }
