@@ -99,14 +99,14 @@ class _SetupScreenState extends State<SetupScreen> {
                       child: Column(
                         children: [
                           Text(
-                            'Dobrodošli u ODLIKAŠ+!',
+                            'Dobrodošli u ODLIKAŠ tablet!',
                             style: GoogleFonts.inter(
                                 fontSize: res.scaleWidth(context, 17),
                                 fontWeight: FontWeight.bold),
                           ),
                           SizedBox(height: res.scaleHeight(context, 16)),
                           Text(
-                            'Primjetili smo da je ovo prvo pokretanje ODLIKAŠ+ aplikacije.\n'
+                            'Primjetili smo da je ovo prvo pokretanje ODLIKAŠ tablet aplikacije.\n'
                             'Pritisnite "Nastavi" kako bi i ti postao ODLIKAŠ.',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.inter(
